@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#464555",
+                        "outline": "#777587",
+                        "on-secondary-fixed": "#151c27",
+                        "secondary-fixed": "#dce2f3",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-surface": "#302f39",
+                        "on-secondary-container": "#5e6572",
+                        "surface-container-high": "#eae6f4",
+                        "surface": "#fcf8ff",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed": "#0f0069",
+                        "tertiary-container": "#a44100",
+                        "outline-variant": "#c7c4d8",
+                        "error-container": "#ffdad6",
+                        "on-background": "#1b1b24",
+                        "secondary-fixed-dim": "#c0c7d6",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "surface-tint": "#4d44e3",
+                        "secondary-container": "#dce2f3",
+                        "inverse-on-surface": "#f3effc",
+                        "surface-bright": "#fcf8ff",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "on-tertiary-container": "#ffd2be",
+                        "surface-container-low": "#f5f2ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#dad7ff",
+                        "on-secondary-fixed-variant": "#404754",
+                        "on-error-container": "#93000a",
+                        "background": "#fcf8ff",
+                        "on-tertiary-fixed": "#351000",
+                        "primary-container": "#4f46e5",
+                        "on-surface": "#1b1b24",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "surface-variant": "#e4e1ee",
+                        "surface-container-highest": "#e4e1ee",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed": "#ffdbcc",
+                        "secondary": "#585f6c",
+                        "primary": "#3525cd",
+                        "tertiary": "#7e3000",
+                        "inverse-primary": "#c3c0ff",
+                        "surface-container": "#f0ecf9",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#dcd8e5",
+                        "primary-fixed": "#e2dfff",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "margin-desktop": "24px",
+                        "xs": "4px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "gutter": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "headline-md-mobile": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                        "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500"}],
+                        "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-sm": ["18px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-md-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                        "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .modal-blur {
+            backdrop-filter: blur(8px);
+            background-color: rgba(27, 27, 36, 0.4);
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c7c4d8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface">
+<!-- Background Content (Simulating Investors Detail Page) -->
+<div class="fixed inset-0 overflow-hidden flex">
+<!-- SideNav (Predicted Component) -->
+<aside class="fixed left-0 top-0 h-full w-60 flex flex-col py-md px-sm bg-surface border-r border-outline-variant">
+<div class="px-md mb-xl">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">SecondaryDesk</h1>
+<p class="text-xs text-on-surface-variant font-medium opacity-70">Venture CRM</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-sm">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-sm">account_tree</span>
+<span class="font-label-md text-label-md">Deal Board</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-primary font-semibold border-r-2 border-primary bg-surface-container" href="#">
+<span class="material-symbols-outlined mr-sm">groups</span>
+<span class="font-label-md text-label-md">Investors</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-sm">inventory_2</span>
+<span class="font-label-md text-label-md">Shares</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-sm">notifications</span>
+<span class="font-label-md text-label-md">Notifications</span>
+</a>
+</nav>
+<div class="mt-auto pt-md border-t border-outline-variant">
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined mr-sm">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-60 flex-1 h-screen overflow-y-auto bg-surface-bright">
+<div class="max-w-7xl mx-auto p-lg">
+<header class="flex justify-between items-end mb-xl">
+<div>
+<div class="flex items-center gap-sm mb-xs">
+<span class="bg-primary/10 text-primary px-sm py-1 rounded-full font-label-sm text-label-sm">Investor Detail</span>
+<span class="text-outline">•</span>
+<span class="text-on-surface-variant font-label-sm text-label-sm">INV-2024-089</span>
+</div>
+<h2 class="font-display-lg text-display-lg text-on-surface">Blue Horizon Ventures</h2>
+</div>
+<div class="flex gap-sm">
+<button class="bg-surface border border-outline-variant px-md py-sm rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-all">Edit Info</button>
+<button class="bg-primary text-white px-md py-sm rounded-lg font-label-md text-label-md shadow-sm hover:opacity-90 transition-all flex items-center">
+<span class="material-symbols-outlined mr-xs text-[18px]">add</span>
+                            Log Activity
+                        </button>
+</div>
+</header>
+<div class="grid grid-cols-12 gap-lg">
+<div class="col-span-8 space-y-lg">
+<div class="bg-white border border-outline-variant rounded-xl p-lg">
+<h3 class="font-headline-sm text-headline-sm mb-md">Timeline</h3>
+<div class="space-y-md blur-[2px] pointer-events-none">
+<div class="flex gap-md">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">call</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md">Introduction Call with Sarah Jenkins</p>
+<p class="text-body-sm text-on-surface-variant">Discussed Q3 allocation strategy and interested in Secondary LP interest.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="col-span-4 space-y-lg">
+<div class="bg-white border border-outline-variant rounded-xl p-lg">
+<h3 class="font-headline-sm text-headline-sm mb-md">Key Contacts</h3>
+<div class="space-y-sm blur-[2px] pointer-events-none">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-secondary-container"></div>
+<span class="font-label-md text-label-md">Sarah Jenkins (Managing Director)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Modal Activity Logger (Primary Focus) -->
+<div class="fixed inset-0 z-50 flex items-center justify-center modal-blur p-md" id="activityModal">
+<div class="bg-white w-full max-w-xl rounded-xl shadow-2xl border border-outline-variant flex flex-col max-h-[921px] animate-in fade-in zoom-in duration-200">
+<!-- Modal Header -->
+<div class="px-lg py-md border-b border-outline-variant flex items-center justify-between">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">활동 기록</h2>
+<button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors" onclick="this.closest('#activityModal').style.display='none'">
+<span class="material-symbols-outlined text-on-surface-variant">close</span>
+</button>
+</div>
+<!-- Modal Content (Scrollable) -->
+<div class="px-lg py-lg overflow-y-auto space-y-lg">
+<!-- Activity Type Grid -->
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">활동 유형</label>
+<div class="grid grid-cols-4 gap-sm">
+<button class="flex flex-col items-center justify-center p-sm border-2 border-primary bg-primary/5 rounded-lg text-primary transition-all active:scale-95">
+<span class="material-symbols-outlined mb-xs">groups</span>
+<span class="font-label-sm text-label-sm">미팅</span>
+</button>
+<button class="flex flex-col items-center justify-center p-sm border border-outline-variant rounded-lg text-secondary hover:bg-surface-container-high transition-all active:scale-95">
+<span class="material-symbols-outlined mb-xs">call</span>
+<span class="font-label-sm text-label-sm">통화</span>
+</button>
+<button class="flex flex-col items-center justify-center p-sm border border-outline-variant rounded-lg text-secondary hover:bg-surface-container-high transition-all active:scale-95">
+<span class="material-symbols-outlined mb-xs">mail</span>
+<span class="font-label-sm text-label-sm">이메일</span>
+</button>
+<button class="flex flex-col items-center justify-center p-sm border border-outline-variant rounded-lg text-secondary hover:bg-surface-container-high transition-all active:scale-95">
+<span class="material-symbols-outlined mb-xs">more_horiz</span>
+<span class="font-label-sm text-label-sm">기타</span>
+</button>
+</div>
+</div>
+<!-- Form Fields -->
+<div class="grid grid-cols-2 gap-md">
+<div class="col-span-1">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">날짜 및 시간</label>
+<div class="relative">
+<input class="w-full px-md py-sm bg-white border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" type="datetime-local" value="2024-05-24T14:30"/>
+</div>
+</div>
+<div class="col-span-1">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">담당자</label>
+<select class="w-full px-md py-sm bg-white border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none appearance-none">
+<option>김태현 수석</option>
+<option>이지은 팀장</option>
+<option>박민수 본부장</option>
+</select>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">참석자 (Investor Contacts)</label>
+<div class="flex flex-wrap gap-xs p-sm border border-outline-variant rounded-lg bg-surface-container-low min-h-[44px]">
+<span class="flex items-center gap-xs px-sm py-1 bg-white border border-outline-variant rounded-full font-label-sm text-label-sm text-on-surface">
+                            Sarah Jenkins
+                            <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<span class="flex items-center gap-xs px-sm py-1 bg-white border border-outline-variant rounded-full font-label-sm text-label-sm text-on-surface">
+                            Thomas Miller
+                            <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<button class="flex items-center px-sm py-1 font-label-sm text-label-sm text-primary hover:underline">+ 추가</button>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">관련 딜 (Optional)</label>
+<div class="relative">
+<span class="absolute left-md top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-[20px]">search</span>
+<input class="w-full pl-xl pr-md py-sm bg-white border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" placeholder="딜 보드에서 검색..." type="text"/>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">활동 내용</label>
+<div class="border border-outline-variant rounded-lg overflow-hidden">
+<div class="flex items-center gap-sm px-sm py-1 bg-surface-container border-b border-outline-variant">
+<button class="p-1 hover:bg-surface-variant rounded material-symbols-outlined text-[18px]">format_bold</button>
+<button class="p-1 hover:bg-surface-variant rounded material-symbols-outlined text-[18px]">format_italic</button>
+<button class="p-1 hover:bg-surface-variant rounded material-symbols-outlined text-[18px]">format_list_bulleted</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="p-1 hover:bg-surface-variant rounded material-symbols-outlined text-[18px]">link</button>
+</div>
+<textarea class="w-full p-md min-h-[120px] bg-white font-body-md text-body-md focus:outline-none resize-none" placeholder="주요 논의 내용 및 다음 단계에 대해 작성하세요..."></textarea>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface-variant mb-sm">첨부 파일</label>
+<div class="border-2 border-dashed border-outline-variant rounded-lg p-lg flex flex-col items-center justify-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors text-[32px] mb-xs">cloud_upload</span>
+<p class="font-label-md text-label-md text-on-surface-variant">파일을 드래그하거나 클릭하여 업로드</p>
+<p class="text-[11px] text-outline mt-1">PDF, DOCX, XLSX (최대 10MB)</p>
+</div>
+</div>
+</div>
+<!-- Modal Footer -->
+<div class="px-lg py-md border-t border-outline-variant bg-surface-container-low rounded-b-xl flex justify-between items-center">
+<div class="flex items-center gap-sm">
+<input class="rounded border-outline text-primary focus:ring-primary" id="followup" type="checkbox"/>
+<label class="font-label-md text-label-md text-on-surface-variant" for="followup">Follow-up 태스크 생성</label>
+</div>
+<div class="flex gap-sm">
+<button class="px-md py-sm rounded-lg font-label-md text-label-md text-secondary hover:bg-surface-variant transition-all" onclick="this.closest('#activityModal').style.display='none'">취소</button>
+<button class="px-lg py-sm rounded-lg font-label-md text-label-md bg-primary text-white shadow-sm hover:opacity-90 active:scale-95 transition-all">활동 저장</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+        // Simple micro-interaction for the modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('activityModal').style.display = 'none';
+            }
+        });
+
+        // Dropzone simulation
+        const dropzone = document.querySelector('.border-dashed');
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-primary', 'bg-primary/5');
+        });
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-primary', 'bg-primary/5');
+        });
+
+        // Type selection toggle
+        const typeButtons = document.querySelectorAll('.grid-cols-4 button');
+        typeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                typeButtons.forEach(b => {
+                    b.classList.remove('border-primary', 'bg-primary/5', 'text-primary', 'border-2');
+                    b.classList.add('border-outline-variant', 'text-secondary');
+                });
+                btn.classList.add('border-primary', 'bg-primary/5', 'text-primary', 'border-2');
+                btn.classList.remove('border-outline-variant', 'text-secondary');
+            });
+        });
+    </script>
+</body></html>

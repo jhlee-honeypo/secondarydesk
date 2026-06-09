@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Investor Details | SecondaryDesk</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "inverse-surface": "#302f39",
+                    "surface-container-highest": "#e4e1ee",
+                    "surface-container": "#f0ecf9",
+                    "on-surface-variant": "#464555",
+                    "surface-variant": "#e4e1ee",
+                    "surface-bright": "#fcf8ff",
+                    "on-surface": "#1b1b24",
+                    "surface-dim": "#dcd8e5",
+                    "primary-container": "#4f46e5",
+                    "error-container": "#ffdad6",
+                    "secondary": "#585f6c",
+                    "background": "#fcf8ff",
+                    "outline": "#777587",
+                    "on-secondary-container": "#5e6572",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "on-tertiary-fixed-variant": "#7b2f00",
+                    "surface-container-high": "#eae6f4",
+                    "on-background": "#1b1b24",
+                    "surface-tint": "#4d44e3",
+                    "on-tertiary-fixed": "#351000",
+                    "on-tertiary-container": "#ffd2be",
+                    "tertiary-fixed-dim": "#ffb695",
+                    "secondary-container": "#dce2f3",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#f5f2ff",
+                    "tertiary-fixed": "#ffdbcc",
+                    "secondary-fixed": "#dce2f3",
+                    "tertiary": "#7e3000",
+                    "surface": "#fcf8ff",
+                    "on-secondary-fixed-variant": "#404754",
+                    "on-secondary-fixed": "#151c27",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-on-surface": "#f3effc",
+                    "on-error-container": "#93000a",
+                    "primary": "#3525cd",
+                    "on-primary-fixed": "#0f0069",
+                    "tertiary-container": "#a44100",
+                    "primary-fixed": "#e2dfff",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#c3c0ff",
+                    "on-primary-container": "#dad7ff",
+                    "outline-variant": "#c7c4d8",
+                    "error": "#ba1a1a",
+                    "secondary-fixed-dim": "#c0c7d6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "base": "4px",
+                    "xs": "4px",
+                    "sm": "8px",
+                    "margin-mobile": "16px",
+                    "xl": "32px",
+                    "lg": "24px",
+                    "margin-desktop": "24px",
+                    "gutter": "16px",
+                    "md": "16px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Inter"],
+                    "headline-md-mobile": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.03em", "fontWeight": "500"}],
+                    "headline-md-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "headline-sm": ["18px", {"lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9fafb; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .active-tab { border-bottom: 2px solid #3525cd; color: #3525cd; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- SideNavBar (Authority: JSON Execution) -->
+<aside class="fixed left-0 top-0 h-full w-60 bg-surface border-r border-outline-variant flex flex-col py-md px-sm">
+<div class="mb-xl px-sm">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">SecondaryDesk</h1>
+<p class="text-label-sm font-label-sm text-secondary uppercase tracking-wider">Venture CRM</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Active State Logic: Mapping 'Investors' as active -->
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span class="font-body-md text-body-md">Deal Board</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-primary font-semibold border-r-2 border-primary bg-surface-container" href="#">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+<span class="font-body-md text-body-md">Investors</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-body-md text-body-md">Shares</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="font-body-md text-body-md">Notifications</span>
+</a>
+</nav>
+<button class="mb-lg mx-sm py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+            New Deal
+        </button>
+<div class="pt-md border-t border-outline-variant space-y-1">
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-sm py-2 rounded transition-colors duration-150 text-secondary hover:bg-surface-container-high" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="font-body-md text-body-md">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Shell -->
+<div class="ml-60 flex flex-col min-h-screen">
+<!-- TopAppBar (Authority: JSON Execution) -->
+<header class="h-16 flex items-center justify-between px-lg bg-surface-bright border-b border-outline-variant">
+<div class="flex items-center flex-1">
+<div class="relative w-64 mr-xl">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline" data-icon="search">search</span>
+<input class="w-full pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Search deals, investors..." type="text"/>
+<span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] border border-outline-variant px-1 rounded text-outline font-mono">⌘K</span>
+</div>
+<nav class="flex gap-lg">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Portfolio</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Liquidity</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary p-2" data-icon="filter_list">filter_list</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary p-2" data-icon="download">download</button>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="User Profile Image" class="w-full h-full object-cover" data-alt="A professional headshot of a Korean investment professional in a modern office, wearing a sharp navy blue suit and a crisp white shirt. The background is a blurred high-end corporate office with soft, neutral lighting, following a clean and professional corporate aesthetic with indigo tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_oeth_yl38fgMSVNOpqPUcSGaCj47xRjTPcQrnLRXHcq0yJRtwhf3J5PYQIQttUJLKzb3kyQe3BCXkDtN7o6tckn18zxeIbVgI2f50CdRpS7PwfKxETO1CUlvbPlD1Cb-dfsn8EElUepUM9ApcQ7YHaOadPLPQZ0jyC149twHkhFUxWiHjcliYJIVVxLx2LPzyn0zD8KvBAomWihagHfkQ46xoBaDxdrHa3gcfJvOKiXeLhNz4FREbULO_jiqTFfxZFtvRpNlvRE"/>
+</div>
+</div>
+</header>
+<!-- Investor Header Section -->
+<main class="p-lg flex-1 overflow-y-auto">
+<div class="flex flex-col gap-lg max-w-[1400px] mx-auto">
+<!-- Profile Header -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-xl flex items-start justify-between">
+<div class="flex gap-xl">
+<div class="w-20 h-20 bg-primary-fixed flex items-center justify-center rounded-2xl overflow-hidden border border-outline-variant">
+<img alt="Investor Logo" class="w-full h-full object-cover" data-alt="A clean, minimalist logo of a high-end venture capital firm featuring geometric abstractions. The background is a solid, subtle off-white that aligns with a professional financial CRM aesthetic. Lighting is flat and even, emphasizing precision and trust in a corporate environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5n-rH_PGT3v2CGjmgjHCMAlCwphadetnPi29QgbQcjMYzO9bNsNZyI_NdhRRwfaBI7gCUP3vQ1QS-RW-sHmiywjBtf3T8LNsScovVwS2s43pi71JeCMzIiDuUitHKRVN4lqdROCIJ-J744lmAdGYHR70KXbgvTS8bYxTXAMwAUtlYbCz6FsEj2wTVQ8c6qD5NezYuFQpsLP0HsE4VM8rKXuBBX_IwTr3NsIE9C3hsT1I4U2ICwKuKTAryPR1mmOujH3cA3Gl-mUw"/>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<h2 class="font-display-lg text-display-lg text-on-surface">Altos Ventures</h2>
+<div class="flex gap-1">
+<span class="px-2 py-0.5 bg-primary-container text-on-primary-container rounded font-label-sm text-label-sm">VC</span>
+<span class="px-2 py-0.5 bg-surface-container-highest text-on-surface-variant rounded font-label-sm text-label-sm border border-outline-variant">Tier 1</span>
+</div>
+</div>
+<div class="flex items-center gap-4 text-secondary">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]" data-icon="person">person</span>
+<span class="font-body-md text-body-md">담당 매니저: <span class="font-semibold text-on-surface">김한준 (Han-jun Kim)</span></span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[18px]" data-icon="location_on">location_on</span>
+<span class="font-body-md text-body-md">Seoul, KR</span>
+</div>
+</div>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 border border-outline-variant rounded-lg font-label-md text-label-md hover:bg-surface-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="edit">edit</span>
+                            정보 수정
+                        </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all">
+                            Create Entry
+                        </button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="border-b border-outline-variant">
+<nav class="flex gap-lg">
+<a class="pb-3 px-1 font-label-md text-label-md text-secondary hover:text-primary transition-all" href="#">Overview</a>
+<a class="pb-3 px-1 font-label-md text-label-md active-tab font-bold transition-all" href="#">Funds (조합)</a>
+<a class="pb-3 px-1 font-label-md text-label-md text-secondary hover:text-primary transition-all" href="#">Contacts (컨택)</a>
+<a class="pb-3 px-1 font-label-md text-label-md text-secondary hover:text-primary transition-all" href="#">Deals (딜)</a>
+<a class="pb-3 px-1 font-label-md text-label-md text-secondary hover:text-primary transition-all" href="#">Activities (활동)</a>
+</nav>
+</div>
+<!-- Content Grid -->
+<div class="grid grid-cols-12 gap-lg">
+<!-- Left Column: Funds & Contacts -->
+<div class="col-span-8 flex flex-col gap-lg">
+<!-- Funds Section -->
+<section>
+<div class="flex items-center justify-between mb-md">
+<h3 class="font-headline-sm text-headline-sm">운용 조합 (Funds)</h3>
+<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline">
+                                    View All <span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-md">
+<!-- Fund Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-md rounded-xl hover:border-primary transition-colors cursor-pointer group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">알토스 코리아 그로스 펀드 VI</span>
+<span class="text-label-sm font-label-sm text-secondary">Growth Equity</span>
+</div>
+<span class="px-2 py-1 bg-primary/10 text-primary rounded font-label-sm text-label-sm">Secondary High</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 mb-4">
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Dry Powder</p>
+<p class="font-body-md text-body-md text-on-surface">₩120.0B</p>
+</div>
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Investment Objective</p>
+<p class="font-body-md text-body-md text-on-surface">Series C-E Expansion</p>
+</div>
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Maturity Date</p>
+<p class="font-body-md text-body-md text-on-surface">2031.12.31</p>
+</div>
+<div class="flex flex-wrap gap-1 mt-1">
+<span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded text-[10px] text-on-surface-variant">SaaS</span>
+<span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded text-[10px] text-on-surface-variant">Fintech</span>
+</div>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+<p class="text-[10px] text-secondary mt-1 text-right">Capital Deployed: 65%</p>
+</div>
+<!-- Fund Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-md rounded-xl hover:border-primary transition-colors cursor-pointer group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface group-hover:text-primary transition-colors">K-넥스트 유니콘 펀드 2호</span>
+<span class="text-label-sm font-label-sm text-secondary">Late Stage</span>
+</div>
+<span class="px-2 py-1 bg-surface-container-highest text-secondary rounded font-label-sm text-label-sm">Secondary Mid</span>
+</div>
+<div class="grid grid-cols-2 gap-y-3 mb-4">
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Dry Powder</p>
+<p class="font-body-md text-body-md text-on-surface">₩45.0B</p>
+</div>
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Investment Objective</p>
+<p class="font-body-md text-body-md text-on-surface">Pre-IPO Secondary</p>
+</div>
+<div>
+<p class="text-[10px] text-secondary uppercase font-semibold">Maturity Date</p>
+<p class="font-body-md text-body-md text-on-surface">2027.06.30</p>
+</div>
+<div class="flex flex-wrap gap-1 mt-1">
+<span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded text-[10px] text-on-surface-variant">Consumer</span>
+<span class="px-1.5 py-0.5 bg-surface-container border border-outline-variant rounded text-[10px] text-on-surface-variant">B2B</span>
+</div>
+</div>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[88%]"></div>
+</div>
+<p class="text-[10px] text-secondary mt-1 text-right">Capital Deployed: 88%</p>
+</div>
+</div>
+</section>
+<!-- Contacts Section -->
+<section>
+<div class="flex items-center justify-between mb-md">
+<h3 class="font-headline-sm text-headline-sm">네트워크 (Contacts)</h3>
+<button class="text-primary font-label-md text-label-md flex items-center gap-1 hover:underline">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span> 연락처 추가
+                                </button>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-md py-3 font-label-md text-label-md text-secondary">이름</th>
+<th class="px-md py-3 font-label-md text-label-md text-secondary">직함</th>
+<th class="px-md py-3 font-label-md text-label-md text-secondary text-center">의사결정자</th>
+<th class="px-md py-3 font-label-md text-label-md text-secondary">이메일 / 연락처</th>
+<th class="px-md py-3 font-label-md text-label-md text-secondary"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-md py-3 flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center font-bold text-[12px] text-primary">박상</div>
+<span class="font-body-md text-body-md">박상협</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md">대표 파트너</td>
+<td class="px-md py-3 text-center">
+<span class="material-symbols-outlined text-tertiary-container" data-icon="star" style="font-variation-settings: 'FILL' 1;">star</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md text-secondary">shp@altos.vc</td>
+<td class="px-md py-3 text-right">
+<button class="material-symbols-outlined text-secondary hover:text-primary" data-icon="more_vert">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-md py-3 flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center font-bold text-[12px] text-secondary">이지</div>
+<span class="font-body-md text-body-md">이지혜</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md">수석 심사역</td>
+<td class="px-md py-3 text-center">
+<span class="material-symbols-outlined text-outline" data-icon="star">star</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md text-secondary">jhlee@altos.vc</td>
+<td class="px-md py-3 text-right">
+<button class="material-symbols-outlined text-secondary hover:text-primary" data-icon="more_vert">more_vert</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors">
+<td class="px-md py-3 flex items-center gap-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center font-bold text-[12px] text-on-surface-variant">정준</div>
+<span class="font-body-md text-body-md">정준영</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md">심사역</td>
+<td class="px-md py-3 text-center">
+<span class="material-symbols-outlined text-outline" data-icon="star">star</span>
+</td>
+<td class="px-md py-3 font-body-md text-body-md text-secondary">jyjung@altos.vc</td>
+<td class="px-md py-3 text-right">
+<button class="material-symbols-outlined text-secondary hover:text-primary" data-icon="more_vert">more_vert</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Right Column: Activity Timeline -->
+<div class="col-span-4 flex flex-col gap-lg">
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col h-full">
+<div class="p-md border-b border-outline-variant flex items-center justify-between">
+<h3 class="font-label-md text-label-md uppercase tracking-wider text-secondary">Activity Timeline</h3>
+<button class="material-symbols-outlined text-secondary text-[20px]" data-icon="filter_list">filter_list</button>
+</div>
+<div class="flex-1 p-md space-y-6 relative">
+<!-- Timeline Line -->
+<div class="absolute left-[2.25rem] top-8 bottom-8 w-[1px] bg-outline-variant"></div>
+<!-- Activity Item 1 -->
+<div class="relative flex gap-4">
+<div class="z-10 w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]" data-icon="groups">groups</span>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-[10px] text-secondary font-semibold">2023.10.24 • Meeting</p>
+<p class="font-body-sm text-body-sm text-on-surface">그로스 펀드 VI 신규 출자 검토 미팅 진행</p>
+<p class="text-[11px] text-secondary">참석자: 박상협 파트너, 김한준 매니저</p>
+</div>
+</div>
+<!-- Activity Item 2 -->
+<div class="relative flex gap-4">
+<div class="z-10 w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]" data-icon="description">description</span>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-[10px] text-secondary font-semibold">2023.10.12 • Document Sent</p>
+<p class="font-body-sm text-body-sm text-on-surface">Secondary Desk 플랫폼 소개서 및 트랙레코드 발송</p>
+</div>
+</div>
+<!-- Activity Item 3 -->
+<div class="relative flex gap-4">
+<div class="z-10 w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]" data-icon="call">call</span>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-[10px] text-secondary font-semibold">2023.09.28 • Call</p>
+<p class="font-body-sm text-body-sm text-on-surface">이지혜 수석과 구주 매각 희망 물량 확인 통화</p>
+</div>
+</div>
+<!-- Activity Item 4 -->
+<div class="relative flex gap-4">
+<div class="z-10 w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]" data-icon="event_note">event_note</span>
+</div>
+<div class="flex flex-col gap-1">
+<p class="text-[10px] text-secondary font-semibold">2023.09.15 • Note</p>
+<p class="font-body-sm text-body-sm text-on-surface">사내 전략 회의: Altos Ventures 타겟 딜 소싱 추진</p>
+</div>
+</div>
+</div>
+<div class="p-md border-t border-outline-variant">
+<button class="w-full py-2.5 bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-lg font-label-md text-label-md flex items-center justify-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="add">add</span>
+                                    활동 기록 추가
+                                </button>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Floating Micro-interactions Script -->
+<script>
+        document.querySelectorAll('a, button').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.classList.add('scale-95');
+                setTimeout(() => el.classList.remove('scale-95'), 150);
+            });
+        });
+
+        // Simple Search Simulation
+        const searchInput = document.querySelector('input[type="text"]');
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    </script>
+</body></html>

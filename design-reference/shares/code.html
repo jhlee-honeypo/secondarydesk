@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SecondaryDesk | Shares &amp; Assets</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#1b1b24",
+                        "tertiary-container": "#a44100",
+                        "tertiary-fixed-dim": "#ffb695",
+                        "secondary-fixed-dim": "#c0c7d6",
+                        "surface-tint": "#4d44e3",
+                        "on-primary-fixed": "#0f0069",
+                        "primary-fixed": "#e2dfff",
+                        "on-primary-fixed-variant": "#3323cc",
+                        "tertiary-fixed": "#ffdbcc",
+                        "primary": "#3525cd",
+                        "surface-bright": "#fcf8ff",
+                        "surface-container-low": "#f5f2ff",
+                        "outline": "#777587",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-primary-container": "#dad7ff",
+                        "secondary-fixed": "#dce2f3",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-secondary-fixed-variant": "#404754",
+                        "surface-container-highest": "#e4e1ee",
+                        "error": "#ba1a1a",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#7e3000",
+                        "on-secondary-fixed": "#151c27",
+                        "surface-container-high": "#eae6f4",
+                        "inverse-on-surface": "#f3effc",
+                        "surface-variant": "#e4e1ee",
+                        "on-surface-variant": "#464555",
+                        "on-tertiary-container": "#ffd2be",
+                        "secondary": "#585f6c",
+                        "on-tertiary-fixed-variant": "#7b2f00",
+                        "outline-variant": "#c7c4d8",
+                        "surface-dim": "#dcd8e5",
+                        "inverse-surface": "#302f39",
+                        "inverse-primary": "#c3c0ff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#5e6572",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#1b1b24",
+                        "on-tertiary-fixed": "#351000",
+                        "background": "#fcf8ff",
+                        "surface": "#fcf8ff",
+                        "primary-container": "#4f46e5",
+                        "surface-container": "#f0ecf9",
+                        "secondary-container": "#dce2f3",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "base": "4px",
+                        "margin-desktop": "24px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "gutter": "16px",
+                        "sm": "8px",
+                        "margin-mobile": "16px",
+                        "xl": "32px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e4e1ee; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c7c4d8; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar (Authority Source: JSON) -->
+<aside class="fixed left-0 top-0 h-full w-60 bg-surface dark:bg-on-surface border-r border-outline-variant dark:border-outline flex flex-col h-full py-md px-sm z-50">
+<div class="mb-xl px-md">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface dark:text-surface-bright">SecondaryDesk</h1>
+<p class="text-xs text-secondary dark:text-secondary-fixed-dim">Venture CRM</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Navigation Items Mapping -->
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-md text-body-md">Deal Board</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-body-md text-body-md">Investors</span>
+</a>
+<!-- ACTIVE STATE: Shares (The current screen) -->
+<a class="flex items-center gap-md px-md py-sm text-primary dark:text-primary-fixed font-semibold border-r-2 border-primary bg-surface-container-high dark:bg-surface-variant rounded-l-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-body-md text-body-md">Shares</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 rounded-lg group active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-body-md text-body-md">Notifications</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1">
+<button class="w-full mb-md py-sm px-md bg-primary text-on-primary rounded-lg font-semibold active:scale-95 transition-transform">New Deal</button>
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="flex items-center gap-md px-md py-sm text-secondary dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-body-md text-body-md">Support</span>
+</a>
+<div class="flex items-center gap-sm mt-md p-sm bg-surface-container rounded-xl">
+<img alt="User Profile" class="w-8 h-8 rounded-full bg-secondary-container" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnUAEhW_YEd9mt6sJWEna67UCdqbLoySD5ZVmEm74IMYbZcM0tRGxPfI0smhjRWocVvkeuG4qeDb6Lc2gDQdEzQQOXtKo3Xd-4n9iAQP3W9oVnrromTStfBscWBlbH8BBmAsBYfYtvsawKDInIGbACHNORzUj4r3u_27LhRr8DiNB1QLjuauuW2wi_gAkBYR0Tv8wXv2F1QSoB-lVUdc96L50nHngH45OSNj7JxDNsvr0Dz5UnmcDDm5_zQBISLk5QzbnrnJkpgGw"/>
+<div class="overflow-hidden">
+<p class="text-sm font-bold truncate">Kim Senior</p>
+<p class="text-[10px] text-secondary truncate">Lead Investment Manager</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopAppBar (Authority Source: JSON) -->
+<header class="fixed top-0 left-0 right-0 h-16 bg-surface-bright dark:bg-background border-b border-outline-variant dark:border-outline flex items-center justify-between w-full px-lg ml-60 z-40">
+<div class="flex items-center gap-xl">
+<div class="relative focus-within:ring-2 focus-within:ring-primary rounded-lg transition-all">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-sm">search</span>
+<input class="bg-surface-container-lowest border-outline-variant text-sm rounded-lg pl-9 pr-4 py-1.5 w-64 focus:outline-none" placeholder="자산 또는 포트폴리오 검색 (Cmd + K)" type="text"/>
+</div>
+<nav class="hidden md:flex items-center gap-lg">
+<a class="font-body-md text-on-surface-variant dark:text-secondary-fixed-dim hover:text-primary transition-all" href="#">Portfolio</a>
+<a class="font-body-md text-primary dark:text-primary-fixed border-b-2 border-primary pb-1" href="#">Liquidity</a>
+<a class="font-body-md text-on-surface-variant dark:text-secondary-fixed-dim hover:text-primary transition-all" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<div class="flex gap-sm">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-all">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-lg transition-all">
+<span class="material-symbols-outlined">download</span>
+</button>
+</div>
+<button class="bg-primary-container text-on-primary px-4 py-1.5 rounded-lg text-sm font-semibold active:scale-95 transition-transform">Create Entry</button>
+<div class="h-8 w-px bg-outline-variant"></div>
+<img alt="User Profile Image" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBr3gs4RJnfmWYxnem-n5ImUWeNjNloRCR3Em6cic4PfO7U1COQJF5N8N1OhaOrro-1Nu-bAKWSQGSQyjONHDl1CvsX6BsUJzGv3OFS_KpliHu_18nYEopsiqtrx3EGDrYdjEgvm8lnvTLo4hrKz1G4C49U6dGuGQDhGqudGzQMmrT1F4C10ejJTJiZcm8DgktIGj1gseg21HSuP6ATymW04WPlrqPanzItrZiOpzrzy4pvAmL_vYWc1Z7Y7a-wZFp72Fd24evWcHQ"/>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-60 pt-16 min-h-screen bg-[#F9FAFB]">
+<div class="p-lg max-w-[1600px] mx-auto">
+<!-- Page Header -->
+<div class="mb-xl flex justify-between items-end">
+<div>
+<nav class="flex items-center gap-2 text-xs text-secondary mb-2">
+<span>Shares</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary font-medium">Available Portfolio</span>
+</nav>
+<h2 class="font-display-lg text-display-lg text-on-surface">매각 가능 자산 현황</h2>
+<p class="text-secondary font-body-md mt-1">현재 세컨더리 시장에 출회된 주요 포트폴리오사 주식 리스트입니다.</p>
+</div>
+<div class="flex gap-2">
+<div class="flex items-center gap-2 bg-white border border-outline-variant px-3 py-1.5 rounded-lg text-xs font-medium">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                        실시간 업데이트 중
+                    </div>
+</div>
+</div>
+<!-- Bento Stats Summary -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-lg">
+<div class="bg-white p-lg rounded-xl border border-outline-variant">
+<p class="text-label-sm text-secondary mb-2 uppercase tracking-wider">총 매각 희망가</p>
+<p class="font-display-lg text-2xl text-on-surface">₩1,240.5억</p>
+<div class="mt-4 flex items-center gap-1 text-xs text-error font-medium">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>전주 대비 4.2% 증가</span>
+</div>
+</div>
+<div class="bg-white p-lg rounded-xl border border-outline-variant">
+<p class="text-label-sm text-secondary mb-2 uppercase tracking-wider">신규 등록 자산</p>
+<p class="font-display-lg text-2xl text-on-surface">12건</p>
+<div class="mt-4 flex items-center gap-1 text-xs text-primary font-medium">
+<span class="material-symbols-outlined text-sm">new_releases</span>
+<span>최근 24시간 내</span>
+</div>
+</div>
+<div class="bg-white p-lg rounded-xl border border-outline-variant">
+<p class="text-label-sm text-secondary mb-2 uppercase tracking-wider">평균 멀티플</p>
+<p class="font-display-lg text-2xl text-on-surface">2.4x</p>
+<div class="mt-4 flex items-center gap-1 text-xs text-secondary font-medium">
+<span class="material-symbols-outlined text-sm">analytics</span>
+<span>Pre-money 기준</span>
+</div>
+</div>
+<div class="bg-white p-lg rounded-xl border border-outline-variant">
+<p class="text-label-sm text-secondary mb-2 uppercase tracking-wider">검토 중인 딜</p>
+<p class="font-display-lg text-2xl text-on-surface">34건</p>
+<div class="mt-4 flex items-center gap-1 text-xs text-primary font-medium">
+<span class="material-symbols-outlined text-sm">hourglass_bottom</span>
+<span>DD 진행 중 8건</span>
+</div>
+</div>
+</div>
+<!-- Asset Table Container -->
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+<!-- Table Controls -->
+<div class="px-lg py-md border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+<div class="flex items-center gap-md">
+<button class="bg-primary-container/10 text-primary px-3 py-1.5 rounded-lg text-sm font-semibold border border-primary/20">All Assets</button>
+<button class="text-secondary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-container transition-colors">Series B+</button>
+<button class="text-secondary px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-container transition-colors">Emergency Sale</button>
+</div>
+<div class="flex items-center gap-sm">
+<span class="text-xs text-secondary">정렬 기준:</span>
+<select class="text-xs border-outline-variant rounded-lg py-1 pl-2 pr-8 focus:ring-primary focus:border-primary">
+<option>등록일순</option>
+<option>매각가 높은순</option>
+<option>라운드순</option>
+</select>
+</div>
+</div>
+<!-- Table Content -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-lg py-4 font-label-md text-label-md text-secondary uppercase tracking-tight">포트폴리오사</th>
+<th class="px-md py-4 font-label-md text-label-md text-secondary uppercase tracking-tight text-center">투자 라운드</th>
+<th class="px-md py-4 font-label-md text-label-md text-secondary uppercase tracking-tight text-right">희망 매각가</th>
+<th class="px-md py-4 font-label-md text-label-md text-secondary uppercase tracking-tight text-right">주식 수</th>
+<th class="px-md py-4 font-label-md text-label-md text-secondary uppercase tracking-tight">매각 사유</th>
+<th class="px-md py-4 font-label-md text-label-md text-secondary uppercase tracking-tight">담당 심사역</th>
+<th class="px-lg py-4 font-label-md text-label-md text-secondary uppercase tracking-tight text-right">Action</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-blue-100 flex items-center justify-center text-blue-600 font-bold">A</div>
+<div>
+<p class="font-headline-sm text-sm font-bold text-on-surface">에이아이랩스</p>
+<p class="text-xs text-secondary">AI Infrastructure</p>
+</div>
+</div>
+</td>
+<td class="px-md py-4 text-center">
+<span class="px-2 py-1 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Series C</span>
+</td>
+<td class="px-md py-4 text-right">
+<p class="font-bold text-sm">₩45,000,000,000</p>
+<p class="text-[10px] text-secondary">보통주 / 상환전환우선주</p>
+</td>
+<td class="px-md py-4 text-right font-mono text-sm text-secondary">
+                                    125,000 주
+                                </td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+<span class="text-sm">LP 조기 상환 요청</span>
+</div>
+</td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCv7z-Ii5XkyF9gXA1T6a4hsr8idV0aFkNs2NdYVhybb_JXdBlohoFGk82cXDx86_OxTMfalNUvz6rnn-R3lzl1izzl0ovHo4t6yXLXyo8rk2G07OV4ZghrUDIunpqE_Vrq4wwuuLHFhTwIKV-z5uBw0EbCXGK1rjbpqXFfNVgtV7GzLGfRR8szGF2DZOhdJF6vUVNzPpk6Y2QW7O1-zhlOYocrKDJpxNRCKjZSYRkxXK2EMAJ4cs_6gw7-vTthshbAgMAyWiP8R1I"/>
+<span class="text-sm">정준수 팀장</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="text-primary hover:underline text-sm font-semibold">검토하기</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">G</div>
+<div>
+<p class="font-headline-sm text-sm font-bold text-on-surface">그린모빌리티</p>
+<p class="text-xs text-secondary">Clean Tech</p>
+</div>
+</div>
+</td>
+<td class="px-md py-4 text-center">
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">Series B</span>
+</td>
+<td class="px-md py-4 text-right">
+<p class="font-bold text-sm">₩12,500,000,000</p>
+<p class="text-[10px] text-secondary">보통주</p>
+</td>
+<td class="px-md py-4 text-right font-mono text-sm text-secondary">
+                                    48,200 주
+                                </td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="text-sm">포트폴리오 리밸런싱</span>
+</div>
+</td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5hw8sGwNhVhVztKBEMEZsY4sjbQkFqms7pG4mc8D_GURfTMMosu5QzK9rxfJL1juBbbHpTSxXYQYagML3rIA_Egltv6LJyVNwKDUxMSOuN1AWIChsQukhZIgYDQbfcrKD8QiaKMl7RcCmAuztE7gcHDp5AP39lFB8NQm4icZ5nkS4XRjqMkHuTooaRYqhcRhVPzQ6i6BMKAVZ_GMW11JvfOYmdEh46XkM6DNCyqPX-63FxaNXPbjFi-hCwuVh_hmBQkFod607tb4"/>
+<span class="text-sm">이현정 수석</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="text-primary hover:underline text-sm font-semibold">검토하기</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-amber-100 flex items-center justify-center text-amber-600 font-bold">K</div>
+<div>
+<p class="font-headline-sm text-sm font-bold text-on-surface">케이바이오</p>
+<p class="text-xs text-secondary">BioTech / Healthcare</p>
+</div>
+</div>
+</td>
+<td class="px-md py-4 text-center">
+<span class="px-2 py-1 bg-tertiary-fixed text-on-tertiary-fixed-variant text-[10px] font-bold rounded uppercase">Series D</span>
+</td>
+<td class="px-md py-4 text-right">
+<p class="font-bold text-sm">₩88,000,000,000</p>
+<p class="text-[10px] text-secondary">전환우선주(CPS)</p>
+</td>
+<td class="px-md py-4 text-right font-mono text-sm text-secondary">
+                                    310,000 주
+                                </td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-sm">펀드 만기 도래</span>
+</div>
+</td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXHZabEL6FV1ClkTHVCG57IUS2RQKVjGNYGIbm7mIuLZ7kMVp-2kPnGtIx6gFznoIH6jf1MA7SF3I3X1NGMCU1Vpr8MrtGgcvHT_J6O-dCCoG--SxtaOlTYWJap5oAVivHTtLWe1M8t1sgCqpXUzXUtTDn_H3qoDiubbUtQ--5-lskoONyRjMyqN3AYJCzh39vuNYCmIIX5HPBe-w2l-hMviX-IVo18q-VjzguMXtmUZSksSSu27qGwPO28r1halNDiZ57qoXtZZw"/>
+<span class="text-sm">박기웅 이사</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="text-primary hover:underline text-sm font-semibold">검토하기</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-lg py-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-purple-100 flex items-center justify-center text-purple-600 font-bold">V</div>
+<div>
+<p class="font-headline-sm text-sm font-bold text-on-surface">브이로그</p>
+<p class="text-xs text-secondary">SaaS / Logistics</p>
+</div>
+</div>
+</td>
+<td class="px-md py-4 text-center">
+<span class="px-2 py-1 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">Series A</span>
+</td>
+<td class="px-md py-4 text-right">
+<p class="font-bold text-sm">₩3,200,000,000</p>
+<p class="text-[10px] text-secondary">보통주</p>
+</td>
+<td class="px-md py-4 text-right font-mono text-sm text-secondary">
+                                    15,000 주
+                                </td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-outline"></span>
+<span class="text-sm">임직원 구주 매각</span>
+</div>
+</td>
+<td class="px-md py-4">
+<div class="flex items-center gap-2">
+<img class="w-5 h-5 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxp0ejaKNnFpgfH4cp5x8eLkTxuZ1wavt7Gv4NrVGC3JNL0PJYIDMefHjx4wrqmfWVEj1GYnR4LnMkSp_Jr0wosTlyUjjYsel6y7Gv5F5oX7vNPLrLFmZTXAtSmX3ihKEA_7TkkQcI-IipJ1D0_bmjZCZT_K-ZAAGLsG_YqDcT6xtc3wv5JqDOlj5nwnPvFf8UT2jw-jNJ-s10DTSaShQtkADwd7qj3m4wOGAbcVyYVm8tzhDzqV21Wfer-zGyTwoOWoVzRZyiWMg"/>
+<span class="text-sm">최하늘 책임</span>
+</div>
+</td>
+<td class="px-lg py-4 text-right">
+<button class="text-primary hover:underline text-sm font-semibold">검토하기</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-lg py-md border-t border-outline-variant flex items-center justify-between">
+<p class="text-xs text-secondary">총 48개 중 1-4개 표시 중</p>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center bg-primary text-on-primary rounded font-bold text-xs">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-surface-container transition-colors text-xs">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-surface-container transition-colors text-xs">3</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant rounded hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Contextual Insight Footer Card -->
+<div class="mt-lg grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="md:col-span-2 bg-primary/5 border border-primary/20 rounded-xl p-lg flex gap-lg items-center">
+<div class="w-12 h-12 bg-primary-container rounded-full flex items-center justify-center text-on-primary shrink-0">
+<span class="material-symbols-outlined">lightbulb</span>
+</div>
+<div>
+<h4 class="font-bold text-on-surface">시인성 높은 딜 정보 분석</h4>
+<p class="text-sm text-secondary mt-1 leading-relaxed">현재 AI 및 바이오 섹션의 매각 출회 비중이 지난 분기 대비 15% 증가했습니다. 해당 섹터의 최근 6개월 내 성사된 세컨더리 멀티플 평균은 2.1x이며, 현재 리스트의 자산들은 시장 평균 대비 약 10% 낮은 밸류에이션으로 제안되었습니다.</p>
+</div>
+</div>
+<div class="bg-surface-container rounded-xl p-lg border border-outline-variant relative overflow-hidden group">
+<div class="relative z-10">
+<h4 class="font-bold text-on-surface">실시간 리포트 다운로드</h4>
+<p class="text-xs text-secondary mt-1">2024년 2분기 세컨더리 시장 동향 리포트 (PDF)</p>
+<button class="mt-4 text-primary text-xs font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
+                            지금 다운로드 <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<span class="absolute -bottom-4 -right-4 material-symbols-outlined text-8xl text-outline-variant opacity-20 group-hover:rotate-12 transition-transform">article</span>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Micro-interactions for table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if(e.target.tagName !== 'BUTTON') {
+                    // Logic to show detail pane or navigate
+                    console.log('Row clicked:', row.querySelector('p.font-bold').innerText);
+                }
+            });
+        });
+
+        // Command + K Shortcut simulation
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                document.querySelector('input[type="text"]').focus();
+            }
+        });
+    </script>
+</body></html>

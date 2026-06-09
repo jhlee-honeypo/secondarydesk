@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SecondaryDesk - Deal Board</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+        }
+        .kanban-column {
+            min-width: 280px;
+            max-width: 320px;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        /* Custom Scrollbar for Kanban */
+        .custom-scroll::-webkit-scrollbar {
+            height: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #d1d5db;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface": "#1b1b24",
+                      "tertiary-container": "#a44100",
+                      "tertiary-fixed-dim": "#ffb695",
+                      "secondary-fixed-dim": "#c0c7d6",
+                      "surface-tint": "#4d44e3",
+                      "on-primary-fixed": "#0f0069",
+                      "primary-fixed": "#e2dfff",
+                      "on-primary-fixed-variant": "#3323cc",
+                      "tertiary-fixed": "#ffdbcc",
+                      "primary": "#3525cd",
+                      "surface-bright": "#fcf8ff",
+                      "surface-container-low": "#f5f2ff",
+                      "outline": "#777587",
+                      "on-error": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "on-primary-container": "#dad7ff",
+                      "secondary-fixed": "#dce2f3",
+                      "on-primary": "#ffffff",
+                      "primary-fixed-dim": "#c3c0ff",
+                      "on-secondary-fixed-variant": "#404754",
+                      "surface-container-highest": "#e4e1ee",
+                      "error": "#ba1a1a",
+                      "surface-container-lowest": "#ffffff",
+                      "tertiary": "#7e3000",
+                      "on-secondary-fixed": "#151c27",
+                      "surface-container-high": "#eae6f4",
+                      "inverse-on-surface": "#f3effc",
+                      "surface-variant": "#e4e1ee",
+                      "on-surface-variant": "#464555",
+                      "on-tertiary-container": "#ffd2be",
+                      "secondary": "#585f6c",
+                      "on-tertiary-fixed-variant": "#7b2f00",
+                      "outline-variant": "#c7c4d8",
+                      "surface-dim": "#dcd8e5",
+                      "inverse-surface": "#302f39",
+                      "inverse-primary": "#c3c0ff",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-container": "#5e6572",
+                      "on-secondary": "#ffffff",
+                      "on-background": "#1b1b24",
+                      "on-tertiary-fixed": "#351000",
+                      "background": "#fcf8ff",
+                      "surface": "#fcf8ff",
+                      "primary-container": "#4f46e5",
+                      "surface-container": "#f0ecf9",
+                      "secondary-container": "#dce2f3",
+                      "on-error-container": "#93000a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "base": "4px",
+                      "margin-desktop": "24px",
+                      "xs": "4px",
+                      "lg": "24px",
+                      "gutter": "16px",
+                      "sm": "8px",
+                      "margin-mobile": "16px",
+                      "xl": "32px",
+                      "md": "16px"
+              },
+              "fontFamily": {
+                      "display-lg": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-md": ["Inter"]
+              },
+              "fontSize": {
+                      "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400"}],
+                      "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full w-60 border-r border-outline-variant bg-surface flex flex-col py-md px-sm z-50">
+<div class="mb-xl px-md">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">SecondaryDesk</h1>
+<p class="text-xs font-label-md text-on-surface-variant opacity-70">Venture CRM</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-primary font-semibold border-r-2 border-primary bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md" style="font-variation-settings: 'FILL' 1;">account_tree</span>
+<span class="font-body-md text-body-md">Deal Board</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">groups</span>
+<span class="font-body-md text-body-md">Investors</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">inventory_2</span>
+<span class="font-body-md text-body-md">Shares</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">notifications</span>
+<span class="font-body-md text-body-md">Notifications</span>
+</a>
+</nav>
+<div class="mt-auto space-y-1 border-t border-outline-variant pt-md">
+<button class="w-full bg-primary text-on-primary font-semibold py-sm px-md rounded-lg mb-md active:scale-95 transition-transform">
+                New Deal
+            </button>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+<a class="flex items-center px-md py-sm rounded-lg text-secondary hover:bg-surface-container-high transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-md">help</span>
+<span class="font-body-md text-body-md">Support</span>
+</a>
+</div>
+</aside>
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 left-60 right-0 h-16 bg-surface-bright border-b border-outline-variant flex items-center justify-between px-lg z-40">
+<div class="flex items-center gap-xl">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="w-full bg-surface text-body-md border border-outline-variant rounded-lg pl-10 pr-4 py-1.5 focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Search (Cmd+K)" type="text"/>
+</div>
+<nav class="hidden md:flex items-center gap-lg">
+<a class="font-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Portfolio</a>
+<a class="font-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Liquidity</a>
+<a class="font-body-md text-on-surface-variant hover:text-primary transition-all" href="#">Reports</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container rounded-full">
+<span class="material-symbols-outlined">download</span>
+</button>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-lg text-body-md font-semibold active:scale-95 transition-transform">
+                Create Entry
+            </button>
+<div class="h-8 w-8 rounded-full bg-surface-container overflow-hidden ml-2 border border-outline-variant">
+<img alt="User Profile Image" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP6KuehRccLfcN_yT5RscAG6QFyDI7l38d3-4JYtgc-SnEOaCsItCtIuNc3gRvfDNeLAWk-IpR9m9g2fnkxhMMMVjBW-k6VIOoMCuNA69ij8ovdruVlRTCjZ8K9yxt_xhhj5Pf8Xr8NRrZ88FD64aOxcQg2n-FmyI-EbzYfq8WP2mW_u-D9IgN3LZynfYUTfBHOSHIVS75YyI5DbxdLk9_3bAnOZ4UoDg8GaWScfx2-LCoQ6T2BJXHzpq2xT5kpDXB0EtPkMdSgrU"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-60 pt-16 h-screen flex flex-col bg-[#F9FAFB]">
+<!-- Page Header -->
+<div class="px-lg py-md flex items-center justify-between">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Deal Board</h2>
+<p class="text-body-sm text-on-surface-variant">Manage your secondary share pipeline and track conversion progress.</p>
+</div>
+<div class="flex items-center bg-white border border-outline-variant rounded-lg p-1">
+<button class="px-4 py-1.5 bg-primary text-on-primary rounded-md text-label-md">Pipeline</button>
+<button class="px-4 py-1.5 text-on-surface-variant rounded-md text-label-md hover:bg-surface-container">List View</button>
+</div>
+</div>
+<!-- Kanban Board Container -->
+<div class="flex-1 overflow-x-auto px-lg pb-lg custom-scroll">
+<div class="flex h-full gap-md items-start">
+<!-- Stage: 잠재 매물 (Lead) -->
+<div class="kanban-column flex flex-col h-full bg-surface-container-low rounded-xl border border-outline-variant/30 shrink-0">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-4 bg-slate-400 rounded-full"></span>
+<h3 class="font-label-md text-on-surface uppercase tracking-wider">잠재 매물</h3>
+<span class="bg-white border border-outline-variant px-2 py-0.5 rounded-full text-[10px] font-bold">4</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="flex-1 overflow-y-auto px-md space-y-md pb-md">
+<!-- Card 1 -->
+<div class="bg-white p-md rounded-lg border border-outline-variant hover:border-primary transition-all cursor-pointer group relative">
+<div class="absolute left-0 top-4 bottom-4 w-1 bg-slate-300 rounded-r"></div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-body-lg text-on-surface">토스 (Viva Republica)</h4>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">more_horiz</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Share Volume</span>
+<span class="font-semibold text-on-surface">₩1,200,000,000</span>
+</div>
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Investor</span>
+<span class="text-on-surface">H-Partners</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between border-t border-outline-variant/30 pt-3">
+<span class="text-[10px] bg-surface-container-high text-on-surface-variant px-2 py-1 rounded font-bold uppercase tracking-tighter">Series G</span>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full bg-primary-container text-[8px] flex items-center justify-center text-on-primary ring-2 ring-white">JS</div>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-white p-md rounded-lg border border-outline-variant hover:border-primary transition-all cursor-pointer group relative">
+<div class="absolute left-0 top-4 bottom-4 w-1 bg-slate-300 rounded-r"></div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-body-lg text-on-surface">무신사 (Musinsa)</h4>
+<span class="material-symbols-outlined text-outline-variant">more_horiz</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Share Volume</span>
+<span class="font-semibold text-on-surface">₩500,000,000</span>
+</div>
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Investor</span>
+<span class="text-on-surface">KB Venture</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between border-t border-outline-variant/30 pt-3">
+<span class="text-[10px] bg-surface-container-high text-on-surface-variant px-2 py-1 rounded font-bold uppercase tracking-tighter">Series F</span>
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-[8px] flex items-center justify-center text-on-tertiary ring-2 ring-white">KM</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stage: 실사 진행 (DD) -->
+<div class="kanban-column flex flex-col h-full bg-surface-container-low rounded-xl border border-outline-variant/30 shrink-0">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-4 bg-amber-400 rounded-full"></span>
+<h3 class="font-label-md text-on-surface uppercase tracking-wider">실사 진행</h3>
+<span class="bg-white border border-outline-variant px-2 py-0.5 rounded-full text-[10px] font-bold">2</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="flex-1 overflow-y-auto px-md space-y-md pb-md">
+<!-- Card 1 -->
+<div class="bg-white p-md rounded-lg border border-outline-variant hover:border-primary transition-all cursor-pointer group relative">
+<div class="absolute left-0 top-4 bottom-4 w-1 bg-amber-400 rounded-r"></div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-body-lg text-on-surface">당근마켓 (Daangn)</h4>
+<span class="material-symbols-outlined text-outline-variant">more_horiz</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Share Volume</span>
+<span class="font-semibold text-on-surface">₩850,000,000</span>
+</div>
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Investor</span>
+<span class="text-on-surface">Shinhan Cap</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between border-t border-outline-variant/30 pt-3">
+<div class="flex gap-2">
+<span class="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded font-bold uppercase">75% Done</span>
+</div>
+<div class="w-6 h-6 rounded-full bg-primary text-[8px] flex items-center justify-center text-on-primary ring-2 ring-white">LH</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stage: 가격 협상 (Negotiation) -->
+<div class="kanban-column flex flex-col h-full bg-surface-container-low rounded-xl border border-outline-variant/30 shrink-0">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-4 bg-primary-container rounded-full"></span>
+<h3 class="font-label-md text-on-surface uppercase tracking-wider">가격 협상</h3>
+<span class="bg-white border border-outline-variant px-2 py-0.5 rounded-full text-[10px] font-bold">1</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="flex-1 overflow-y-auto px-md space-y-md pb-md">
+<div class="bg-white p-md rounded-lg border border-outline-variant hover:border-primary transition-all cursor-pointer group relative">
+<div class="absolute left-0 top-4 bottom-4 w-1 bg-primary-container rounded-r"></div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-body-lg text-on-surface">야놀자 (Yanolja)</h4>
+<span class="material-symbols-outlined text-outline-variant">more_horiz</span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Share Volume</span>
+<span class="font-semibold text-on-surface">₩2,100,000,000</span>
+</div>
+<div class="flex justify-between text-body-sm">
+<span class="text-on-surface-variant">Investor</span>
+<span class="text-on-surface">Softbank KR</span>
+</div>
+</div>
+<div class="mt-4 flex items-center justify-between border-t border-outline-variant/30 pt-3">
+<span class="text-[10px] bg-primary-container/10 text-primary px-2 py-1 rounded font-bold uppercase tracking-tighter">High Priority</span>
+<div class="w-6 h-6 rounded-full bg-secondary-container text-[8px] flex items-center justify-center text-on-secondary ring-2 ring-white">SK</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Stage: 계약 체결 (Contract) -->
+<div class="kanban-column flex flex-col h-full bg-surface-container-low rounded-xl border border-outline-variant/30 shrink-0">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-4 bg-indigo-600 rounded-full"></span>
+<h3 class="font-label-md text-on-surface uppercase tracking-wider">계약 체결</h3>
+<span class="bg-white border border-outline-variant px-2 py-0.5 rounded-full text-[10px] font-bold">3</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="flex-1 overflow-y-auto px-md space-y-md pb-md">
+<!-- Empty Placeholder for Contract state visual diversity -->
+<div class="bg-white/50 border border-dashed border-outline-variant p-md rounded-lg flex flex-col items-center justify-center py-8">
+<span class="material-symbols-outlined text-outline-variant mb-2">draw</span>
+<p class="text-[11px] font-semibold text-outline">Drop deal here</p>
+</div>
+</div>
+</div>
+<!-- Stage: 딜 클로징 (Closed) -->
+<div class="kanban-column flex flex-col h-full bg-surface-container-low rounded-xl border border-outline-variant/30 shrink-0">
+<div class="p-md flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-4 bg-emerald-500 rounded-full"></span>
+<h3 class="font-label-md text-on-surface uppercase tracking-wider">딜 클로징</h3>
+<span class="bg-white border border-outline-variant px-2 py-0.5 rounded-full text-[10px] font-bold">12</span>
+</div>
+<button class="text-on-surface-variant hover:text-primary"><span class="material-symbols-outlined">add</span></button>
+</div>
+<div class="flex-1 overflow-y-auto px-md space-y-md pb-md">
+<div class="bg-white p-md rounded-lg border border-outline-variant group relative opacity-70 hover:opacity-100 transition-opacity">
+<div class="absolute left-0 top-4 bottom-4 w-1 bg-emerald-500 rounded-r"></div>
+<div class="flex justify-between items-start mb-2">
+<h4 class="font-semibold text-body-lg text-on-surface">채널톡 (Channel.io)</h4>
+<span class="material-symbols-outlined text-emerald-600">check_circle</span>
+</div>
+<div class="space-y-1">
+<p class="text-body-sm text-on-surface-variant">Closed: 2023-11-15</p>
+<p class="text-body-sm font-semibold text-on-surface">₩450,000,000</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Add Stage Spacer -->
+<div class="kanban-column flex flex-col h-full border border-dashed border-outline-variant rounded-xl justify-center items-center opacity-40 hover:opacity-100 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-2xl mb-2">add_circle</span>
+<span class="font-label-md">Add New Stage</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interactions Script -->
+<script>
+        // Simple hover effect for Kanban cards
+        document.querySelectorAll('.kanban-column .bg-white').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+                card.classList.add('shadow-md');
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0px)';
+                card.classList.remove('shadow-md');
+            });
+        });
+
+        // Command + K focus interaction
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                document.querySelector('input[type="text"]').focus();
+            }
+        });
+    </script>
+</body></html>
