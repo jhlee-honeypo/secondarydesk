@@ -138,7 +138,20 @@ src/
 - [x] **Step 0** — 레포 세팅: Next.js + Tailwind + shadcn/ui + Supabase 연결
 - [x] **Step 1** — 스키마 마이그레이션(§4 전체) + RLS — *9개 테이블 생성·RLS 적용 검증 완료*
 - [x] **Step 2** — 인증(F1) — *이메일/비밀번호 로그인 · Proxy 라우트 가드 · 초대 전용*
-- [x] **Step 3** — 투자사·조합·컨택 CRUD + 상세 통합 뷰(F2) — *앱 셸(좌측 네비) · 투자사 목록/상세 · 조합·컨택 CRUD*
-- [ ] Step 4 — 운용펀드 CRUD + 매물 CRUD + 펀드 태깅(F3)
-- [ ] Step 5 — 딜 생성/태깅(F6) + 칸반 보드(F4)
-- [ ] Step 6 — 활동 타임라인(F5) — **▲ 여기까지 MVP**
+- [x] **Step 3** — 투자사·조합·컨택 CRUD + 상세 통합 뷰(F2)
+- [x] **Step 4** — 운용펀드 CRUD + 매물 CRUD + 펀드 태깅(F3)
+- [x] **Step 5** — 딜 생성/태깅(F6) + 칸반 보드(F4, dnd-kit)
+- [x] **Step 6** — 활동 타임라인(F5) — **▲ 여기까지 MVP**
+- [x] **Step 7** — 적합도 매칭(F7) — *조합 mandate 기반 Top N 추천 + 딜 1클릭*
+- [x] **Step 8** — 소개 네트워크(F8) · 전역 검색/저장된 뷰(F9) · 알림(F10)
+- [x] **Step 9** — 대시보드/애널리틱스(F11) — *펀넬 · 매물별 진척 · 드랍/활동량 · 기간·펀드 필터*
+- [x] **Step 10** — 데이터 임포트(F13) — *CSV → 투자사·조합 일괄 생성*
+- [ ] (보류) F12 — 메일/캘린더 외부 연동
+
+## 배포
+
+- **프로덕션**: <https://project1-two-drab.vercel.app> (Vercel)
+- **레포**: <https://github.com/jhlee-honeypo/secondarydesk>
+- **자동 배포**: `main` 브랜치 푸시 시 Vercel이 자동 프로덕션 배포(브랜치/PR은 프리뷰 배포).
+- 수동 배포: `vercel --prod`
+- 런타임 환경변수(Vercel에 등록): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
