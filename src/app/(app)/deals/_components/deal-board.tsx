@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Bookmark, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Bookmark, CalendarPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import {
   DEAL_STAGES,
@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DeleteDialog } from "@/components/app/delete-dialog";
+import { MeetingLogDialog } from "../../activities/_components/meeting-log-dialog";
 import {
   DealFormDialog,
   type DealOptionFund,
@@ -195,14 +196,25 @@ export function DealBoard({
           </Select>
         </div>
 
-        <DealFormDialog
-          {...dialogOptions}
-          trigger={
-            <Button>
-              <Plus />딜
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <MeetingLogDialog
+            investors={investors}
+            trigger={
+              <Button variant="outline">
+                <CalendarPlus />
+                미팅 기록
+              </Button>
+            }
+          />
+          <DealFormDialog
+            {...dialogOptions}
+            trigger={
+              <Button>
+                <Plus />딜
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {/* 저장된 뷰(F9) */}

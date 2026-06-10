@@ -117,8 +117,11 @@ src/
         [id]/page.tsx     # 투자사 상세 (개요·조합·컨택·딜·활동 탭)
         actions.ts        # 투자사·조합·컨택 CRUD 서버 액션
         _components/       # 폼/삭제 다이얼로그 (client)
+      import/           # 투자사·조합 엑셀/CSV 일괄 가져오기 (F13)
+      listings/
+        import/         # 매물 엑셀/CSV 일괄 가져오기 (회사명 dedup + 운용펀드 이름 태깅)
   components/
-    app/              # 셸 컴포넌트 (sidebar-nav, user-menu)
+    app/              # 셸 컴포넌트 (sidebar-nav, user-menu, import-wizard[공용])
     ui/               # shadcn/ui (button, card, badge, input, label, textarea,
                       #            select, dialog, tabs, dropdown-menu, checkbox)
     theme-provider.tsx

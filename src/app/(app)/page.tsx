@@ -25,7 +25,6 @@ export default async function DashboardHome({
   ]);
 
   const maxFunnel = Math.max(1, ...a.funnel.map((f) => f.count));
-  const maxAuthor = Math.max(1, ...a.authorActivity.map((x) => x.count));
   const topActions = notif.actionDeals.slice(0, 5);
 
   return (
@@ -198,66 +197,31 @@ export default async function DashboardHome({
         )}
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* 드랍 분석 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">드랍 분석</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {a.lostReasons.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                드랍된 딜이 없습니다.
-              </p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {a.lostReasons.map((r) => (
-                  <li
-                    key={r.reason}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <span className="truncate text-muted-foreground">
-                      {r.reason}
-                    </span>
-                    <span className="font-medium">{r.count}건</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 활동량(심사역별) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">활동량 (심사역별)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {a.authorActivity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                해당 기간 활동 기록이 없습니다.
-              </p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {a.authorActivity.map((x) => (
-                  <li key={x.name} className="space-y-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate">{x.name}</span>
-                      <span className="text-muted-foreground">{x.count}건</span>
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary/60"
-                        style={{ width: `${(x.count / maxAuthor) * 100}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* 드랍 분석 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">드랍 분석</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {a.lostReasons.length === 0 ? (
+            <p className="text-sm text-muted-foreground">드랍된 딜이 없습니다.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {a.lostReasons.map((r) => (
+                <li
+                  key={r.reason}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="truncate text-muted-foreground">
+                    {r.reason}
+                  </span>
+                  <span className="font-medium">{r.count}건</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

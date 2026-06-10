@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Layers, Plus } from "lucide-react";
+import { FileUp, Layers, Plus } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -73,6 +73,12 @@ export default async function ListingsPage({
             <Link href="/listings/funds">
               <Layers />
               운용펀드 관리
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/listings/import">
+              <FileUp />
+              가져오기
             </Link>
           </Button>
           <ListingFormDialog

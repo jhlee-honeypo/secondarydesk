@@ -1,30 +1,23 @@
 import Link from "next/link";
-import { Plus, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/supabase/auth";
-import type { InvestorWithOwner, UserRow } from "@/lib/types";
+import type { InvestorWithOwner } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { InvestorFormDialog } from "./_components/investor-form-dialog";
 
 export const dynamic = "force-dynamic";
 
 export default async function InvestorsPage() {
   const supabase = await createClient();
-  const me = await getCurrentUser();
 
-  const [{ data: investors }, { data: users }] = await Promise.all([
-    supabase
-      .from("investors")
-      .select("*, owner:users(name, email)")
-      .order("name"),
-    supabase.from("users").select("id, name, email, role").order("name"),
-  ]);
+  const { data: investors } = await supabase
+    .from("investors")
+    .select("*, owner:users(name, email)")
+    .order("name");
 
   const rows = (investors ?? []) as InvestorWithOwner[];
-  const teamUsers = (users ?? []) as UserRow[];
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -32,7 +25,8 @@ export default async function InvestorsPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">투자사</h1>
           <p className="text-sm text-muted-foreground">
-            구주 매수 후보 투자사를 등록하고 상세에서 조합·컨택을 관리합니다.
+            딜 보드의 “새 딜 생성”에서 등록한 투자사가 여기에 모입니다. 상세에서
+            조합·컨택을 관리합니다.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -42,24 +36,14 @@ export default async function InvestorsPage() {
               가져오기
             </Link>
           </Button>
-          <InvestorFormDialog
-            trigger={
-              <Button>
-                <Plus />
-                투자사
-              </Button>
-            }
-            users={teamUsers}
-            currentUserId={me?.id ?? ""}
-          />
         </div>
       </div>
 
       {rows.length === 0 ? (
         <Card className="items-center justify-center py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            아직 등록된 투자사가 없습니다. 오른쪽 위 “투자사” 버튼으로 첫 투자사를
-            등록하세요.
+            아직 등록된 투자사가 없습니다. 딜 보드의 “새 딜 생성”에서 새 투자사를
+            등록하거나, “가져오기”로 일괄 등록하세요.
           </p>
         </Card>
       ) : (

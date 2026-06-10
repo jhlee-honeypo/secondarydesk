@@ -59,6 +59,7 @@ export type Investor = {
   tier: InvestorTier | null;
   website: string | null;
   description: string | null;
+  met_date: string | null;
   owner_id: string | null;
   created_at: string;
   updated_at: string;

@@ -1,5 +1,5 @@
 // 대시보드/애널리틱스(F11, PRD §5.4·§12.2C) — 기간·운용펀드 필터를 반영해
-// 파이프라인 펀넬·핵심 지표·매물별 진척·드랍 분석·활동량을 집계한다. 서버 전용.
+// 파이프라인 펀넬·핵심 지표·매물별 진척·드랍 분석을 집계한다. 서버 전용.
 
 import { createClient } from "@/lib/supabase/server";
 import { DEAL_STAGES, type DealStage } from "@/lib/types";
@@ -12,7 +12,6 @@ export type ListingProgressRow = {
   topStage: DealStage | null;
 };
 export type LostReasonRow = { reason: string; count: number };
-export type AuthorActivityRow = { name: string; count: number };
 
 export type AnalyticsData = {
   holdingFunds: { id: string; name: string }[];
@@ -23,7 +22,6 @@ export type AnalyticsData = {
   funnel: FunnelRow[];
   listingProgress: ListingProgressRow[];
   lostReasons: LostReasonRow[];
-  authorActivity: AuthorActivityRow[];
 };
 
 type DealRow = {
@@ -39,9 +37,7 @@ type DealRow = {
 };
 
 type ActivityRow = {
-  author_id: string;
   occurred_at: string;
-  author: { name: string | null; email: string | null } | null;
 };
 
 const TERMINAL: DealStage[] = ["클로징", "드랍"];
@@ -90,7 +86,7 @@ export async function loadAnalytics({
     dealsQuery,
     supabase
       .from("activities")
-      .select("author_id, occurred_at, author:users(name, email)")
+      .select("occurred_at")
       .gte("occurred_at", sinceStr ?? weekStr),
   ]);
 
@@ -163,21 +159,11 @@ export async function loadAnalytics({
     .map(([reason, count]) => ({ reason, count }))
     .sort((a, b) => b.count - a.count);
 
-  // 활동량(심사역별) + 이번주 활동 수
+  // 이번주 활동 수
   const activities = (actRes.data ?? []) as unknown as ActivityRow[];
   const weekActivityCount = activities.filter(
     (a) => a.occurred_at.slice(0, 10) >= weekStr,
   ).length;
-
-  const authorMap = new Map<string, number>();
-  for (const a of activities) {
-    const name = a.author?.name ?? a.author?.email ?? "—";
-    authorMap.set(name, (authorMap.get(name) ?? 0) + 1);
-  }
-  const authorActivity = [...authorMap.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6);
 
   return {
     holdingFunds: (hf ?? []) as { id: string; name: string }[],
@@ -188,6 +174,5 @@ export async function loadAnalytics({
     funnel,
     listingProgress,
     lostReasons,
-    authorActivity,
   };
 }

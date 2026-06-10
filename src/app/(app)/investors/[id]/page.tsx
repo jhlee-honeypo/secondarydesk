@@ -203,6 +203,12 @@ export default async function InvestorDetailPage({
                   <dd className="text-foreground">{investor.type ?? "—"}</dd>
                 </div>
                 <div>
+                  <dt className="text-xs">만난 일자</dt>
+                  <dd className="text-foreground">
+                    {investor.met_date ? formatDate(investor.met_date) : "—"}
+                  </dd>
+                </div>
+                <div>
                   <dt className="text-xs">등록일</dt>
                   <dd className="text-foreground">
                     {formatDate(investor.created_at)}
