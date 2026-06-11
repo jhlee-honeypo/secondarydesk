@@ -100,6 +100,19 @@ export type Contact = {
   updated_at: string;
 };
 
+// 명함 백데이터(검색용) — 투자사/컨택 자동생성 안 함
+export type BusinessCard = {
+  id: string;
+  name: string;
+  company: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  met_date: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
 // 담당자 이름 조인을 포함한 투자사 목록 행
 export type InvestorWithOwner = Investor & {
   owner: { name: string | null; email: string | null } | null;

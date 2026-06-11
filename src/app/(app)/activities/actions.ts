@@ -61,6 +61,8 @@ async function createInvestorFromForm(
       investor_id: investorId,
       name: contactName,
       title: text(fd, "contact_title"),
+      email: text(fd, "contact_email"),
+      phone: text(fd, "contact_phone"),
     });
   }
 

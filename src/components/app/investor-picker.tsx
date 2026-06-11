@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Lock, Plus, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,11 +16,15 @@ import {
 import { Field } from "@/components/app/field";
 import { cn } from "@/lib/utils";
 import { INVESTOR_TYPES } from "@/lib/types";
+import {
+  searchBusinessCards,
+  type BusinessCardHit,
+} from "@/app/(app)/import/contacts/actions";
 
 export type InvestorOption = { id: string; name: string };
 
 // 로컬 기준 오늘 날짜(YYYY-MM-DD). 날짜 입력 기본값용.
-function todayLocal(): string {
+export function todayLocal(): string {
   const d = new Date();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
@@ -40,16 +44,35 @@ function todayLocal(): string {
 export function InvestorPicker({
   investors,
   showMetDate = true,
+  metDate,
+  onMetDateChange,
 }: {
   investors: InvestorOption[];
   /** 새 투자사 "일자(만난 일자)" 입력 노출 여부. 미팅 기록처럼 상위 폼이
    *  별도 일자를 갖는 경우 false 로 숨긴다. */
   showMetDate?: boolean;
+  /** 만난 일자를 상위 폼이 제어할 때 사용(예: 딜 생성의 단계 진입 일자와 동기화).
+   *  미지정 시 자체 기본값(오늘)을 쓰는 비제어 입력으로 동작한다. */
+  metDate?: string;
+  onMetDateChange?: (value: string) => void;
 }) {
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [investorId, setInvestorId] = useState("");
   const [investorType, setInvestorType] = useState("");
   const [fundKeys, setFundKeys] = useState<number[]>([0]);
+
+  // 프리필 대상(명함 선택 시 채워짐). 비제어→제어 전환으로 일반 타이핑도 동작.
+  const [investorName, setInvestorName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactTitle, setContactTitle] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  // 명함에서 불러온 이메일/휴대폰은 기본 잠금(수기 수정 방지). '직접 입력'으로 해제.
+  const [contactLocked, setContactLocked] = useState(false);
+
+  // 명함 검색(백데이터 자동완성)
+  const [cardQuery, setCardQuery] = useState("");
+  const [cardResults, setCardResults] = useState<BusinessCardHit[]>([]);
 
   function addFundRow() {
     setFundKeys((keys) => [...keys, (keys[keys.length - 1] ?? 0) + 1]);
@@ -58,9 +81,83 @@ export function InvestorPicker({
     setFundKeys((keys) => keys.filter((k) => k !== key));
   }
 
+  // 명함 검색 — onChange 핸들러에서 직접 호출(effect 미사용). 이름/소속 부분일치.
+  async function handleCardQuery(v: string) {
+    setCardQuery(v);
+    setCardResults(v.trim() ? await searchBusinessCards(v) : []);
+  }
+
+  // 명함 선택 → 폼 자동 채움. 소속이 이미 등록된 투자사면 그 투자사를 선택,
+  // 아니면 새 투자사 등록 모드로 회사·사람·직위를 프리필한다.
+  function handlePickCard(card: BusinessCardHit) {
+    const company = (card.company ?? "").trim();
+    const matched = company
+      ? investors.find(
+          (i) => i.name.trim().toLowerCase() === company.toLowerCase(),
+        )
+      : undefined;
+
+    if (matched) {
+      setMode("existing");
+      setInvestorId(matched.id);
+    } else {
+      setMode("new");
+      setInvestorName(company);
+      setContactName(card.name);
+      setContactTitle(card.title ?? "");
+      setContactEmail(card.email ?? "");
+      setContactPhone(card.phone ?? "");
+      setContactLocked(true); // 명함 출처 연락처 잠금
+      if (showMetDate && card.met_date) onMetDateChange?.(card.met_date);
+    }
+    setCardQuery("");
+    setCardResults([]);
+  }
+
   return (
     <div className="space-y-3">
       <input type="hidden" name="investor_mode" value={mode} />
+
+      {/* 명함 검색 — 백데이터에서 이름으로 찾아 투자사·컨택을 자동 채움 */}
+      <div className="space-y-1.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={cardQuery}
+            onChange={(e) => handleCardQuery(e.target.value)}
+            placeholder="명함으로 채우기 — 이름/소속 검색"
+            className="pl-8"
+            aria-label="명함 검색"
+          />
+        </div>
+        {cardResults.length > 0 && (
+          <div className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-input">
+            {cardResults.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handlePickCard(c)}
+                className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm hover:bg-muted/40"
+              >
+                <span className="font-medium text-foreground">{c.name}</span>
+                {c.company && (
+                  <span className="text-muted-foreground">· {c.company}</span>
+                )}
+                {c.title && (
+                  <span className="truncate text-muted-foreground">
+                    · {c.title}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {cardQuery.trim() !== "" && cardResults.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            일치하는 명함이 없습니다. 아래에서 직접 입력하세요.
+          </p>
+        )}
+      </div>
 
       <Field label="투자사" required>
         {/* 모드 토글 */}
@@ -112,7 +209,13 @@ export function InvestorPicker({
             </SelectContent>
           </Select>
         ) : (
-          <Input name="investor_name" placeholder="투자사명" required />
+          <Input
+            name="investor_name"
+            placeholder="투자사명"
+            required
+            value={investorName}
+            onChange={(e) => setInvestorName(e.target.value)}
+          />
         )}
       </Field>
 
@@ -145,7 +248,12 @@ export function InvestorPicker({
                   id="investor_met_date"
                   name="investor_met_date"
                   type="date"
-                  defaultValue={todayLocal()}
+                  {...(metDate !== undefined
+                    ? {
+                        value: metDate,
+                        onChange: (e) => onMetDateChange?.(e.target.value),
+                      }
+                    : { defaultValue: todayLocal() })}
                 />
               </Field>
             )}
@@ -153,15 +261,64 @@ export function InvestorPicker({
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="컨택 심사역" htmlFor="contact_name">
-              <Input id="contact_name" name="contact_name" placeholder="이름" />
+              <Input
+                id="contact_name"
+                name="contact_name"
+                placeholder="이름"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+              />
             </Field>
             <Field label="직책" htmlFor="contact_title">
               <Input
                 id="contact_title"
                 name="contact_title"
                 placeholder="상무 / 심사역 등"
+                value={contactTitle}
+                onChange={(e) => setContactTitle(e.target.value)}
               />
             </Field>
+          </div>
+
+          <div className="space-y-2">
+            {contactLocked && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Lock className="size-3" />
+                <span>명함에서 불러온 연락처입니다.</span>
+                <button
+                  type="button"
+                  onClick={() => setContactLocked(false)}
+                  className="text-primary hover:underline"
+                >
+                  직접 입력
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="이메일" htmlFor="contact_email">
+                <Input
+                  id="contact_email"
+                  name="contact_email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  readOnly={contactLocked}
+                  className={cn(contactLocked && "bg-muted/50 text-muted-foreground")}
+                />
+              </Field>
+              <Field label="휴대폰" htmlFor="contact_phone">
+                <Input
+                  id="contact_phone"
+                  name="contact_phone"
+                  placeholder="010-0000-0000"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  readOnly={contactLocked}
+                  className={cn(contactLocked && "bg-muted/50 text-muted-foreground")}
+                />
+              </Field>
+            </div>
           </div>
 
           <Field label="개요·성향 메모" htmlFor="investor_description">

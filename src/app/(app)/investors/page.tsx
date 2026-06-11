@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { Contact, Upload } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import type { InvestorWithOwner } from "@/lib/types";
@@ -30,6 +30,12 @@ export default async function InvestorsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/import/contacts">
+              <Contact />
+              명함 등록
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href="/import">
               <Upload />

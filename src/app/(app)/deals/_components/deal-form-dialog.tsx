@@ -30,8 +30,9 @@ import {
   type Deal,
   type UserRow,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Field } from "@/components/app/field";
-import { InvestorPicker } from "@/components/app/investor-picker";
+import { InvestorPicker, todayLocal } from "@/components/app/investor-picker";
 import { StageHistoryEditor } from "./stage-history-editor";
 import {
   createDeal,
@@ -58,15 +59,18 @@ function ListingMultiSelect({
   onChange,
   holdingFunds = [],
   listingFundMap = {},
+  initialFund = FUND_ALL,
 }: {
   listings: DealOptionListing[];
   value: string[];
   onChange: (next: string[]) => void;
   holdingFunds?: { id: string; name: string }[];
   listingFundMap?: Record<string, string[]>;
+  /** 보드에서 넘어온 펀드 필터 — 다이얼로그 열릴 때 운용펀드 구분 기본값. */
+  initialFund?: string;
 }) {
   const [q, setQ] = useState("");
-  const [fund, setFund] = useState(FUND_ALL);
+  const [fund, setFund] = useState(initialFund);
   const query = q.trim().toLowerCase();
   const filtered = listings.filter((l) => {
     const byFund =
@@ -240,6 +244,25 @@ function InvestorEditSection({ data }: { data: InvestorEditData }) {
             />
           </Field>
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="이메일" htmlFor="contact_email">
+            <Input
+              id="contact_email"
+              name="contact_email"
+              type="email"
+              placeholder="name@example.com"
+              defaultValue={data.contact?.email ?? ""}
+            />
+          </Field>
+          <Field label="휴대폰" htmlFor="contact_phone">
+            <Input
+              id="contact_phone"
+              name="contact_phone"
+              placeholder="010-0000-0000"
+              defaultValue={data.contact?.phone ?? ""}
+            />
+          </Field>
+        </div>
         {data.contact && (
           <input type="hidden" name="contact_id" value={data.contact.id} />
         )}
@@ -315,6 +338,7 @@ export function DealFormDialog({
   lockInvestorId,
   holdingFunds,
   listingFundMap,
+  initialFundFilter,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: {
@@ -331,6 +355,8 @@ export function DealFormDialog({
   /** 운용펀드 목록 + 매물→운용펀드 매핑(생성 시 매물 복수선택 그룹핑용, 선택). */
   holdingFunds?: { id: string; name: string }[];
   listingFundMap?: Record<string, string[]>;
+  /** 보드의 활성 펀드 필터 — 생성 시 매물 복수선택의 운용펀드 구분 기본값으로 사용. */
+  initialFundFilter?: string;
   /** 제어형(controlled) 사용: 부모가 열림 상태를 보유. (칸반 카드 클릭 등) */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -356,6 +382,14 @@ export function DealFormDialog({
   // 단계: 제어형 Select + hidden input (Radix Select 의 숨은 폼 컨트롤이
   // 드롭다운을 닫으면 값을 유실할 수 있어 명시적 hidden input 으로 제출).
   const [stage, setStage] = useState<string>(deal?.stage ?? "컨택");
+
+  // 생성 시 "단계 진입 일자"(=카드의 컨택일자) — 기본값은 새 투자사 '만난 일자'를
+  // 따라간다. 사용자가 단계 일자를 직접 바꾸면(touched) 그 값으로 고정된다.
+  // (effect 없이 파생값으로 동기화 — 불필요한 cascading render 방지)
+  const [metDate, setMetDate] = useState(todayLocal());
+  const [stageDate, setStageDate] = useState("");
+  const [stageDateTouched, setStageDateTouched] = useState(false);
+  const effectiveStageDate = stageDateTouched ? stageDate : metDate;
 
   // 수정 모드: 연결된 투자사의 편집 데이터(유형·일자·메모·컨택·조합)를
   // 다이얼로그를 열 때 지연 로드한다(칸반 카드엔 투자사 id·name 만 실려옴).
@@ -399,6 +433,9 @@ export function DealFormDialog({
     if (!next) {
       setSelectedListingIds([]);
       setInvestorData(null);
+      setMetDate(todayLocal());
+      setStageDate("");
+      setStageDateTouched(false);
     }
   }
 
@@ -418,6 +455,7 @@ export function DealFormDialog({
         onChange={setSelectedListingIds}
         holdingFunds={holdingFunds}
         listingFundMap={listingFundMap}
+        initialFund={initialFundFilter}
       />
     </Field>
   ) : (
@@ -457,7 +495,11 @@ export function DealFormDialog({
       </div>
     </Field>
   ) : (
-    <InvestorPicker investors={investors} />
+    <InvestorPicker
+      investors={investors}
+      metDate={metDate}
+      onMetDateChange={setMetDate}
+    />
   );
 
   return (
@@ -483,22 +525,45 @@ export function DealFormDialog({
             {investorField}
           </div>
 
-          {/* 단계 — 생성·수정 공통 */}
-          <Field label="단계" required>
-            <input type="hidden" name="stage" value={stage} />
-            <Select value={stage} onValueChange={setStage}>
-              <SelectTrigger>
-                <SelectValue placeholder="선택" />
-              </SelectTrigger>
-              <SelectContent>
-                {DEAL_STAGES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          {/* 단계(+ 생성 시 진입 일자) — 생성·수정 공통.
+              진입 일자 = 카드에 찍히는 그 단계 진입일(예: 컨택일자). 과거 딜을
+              입력할 때 오늘이 아닌 실제 일자로 지정할 수 있다. */}
+          <div className={cn("grid gap-4", !isEdit && "grid-cols-2")}>
+            <Field label="단계" required>
+              <input type="hidden" name="stage" value={stage} />
+              <Select value={stage} onValueChange={setStage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEAL_STAGES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            {!isEdit && (
+              <Field
+                label="단계 진입 일자"
+                htmlFor="stage_date"
+                hint="카드에 표시되는 진입일(기본: 투자사 만난 일자)"
+              >
+                <Input
+                  id="stage_date"
+                  name="stage_date"
+                  type="date"
+                  value={effectiveStageDate}
+                  onChange={(e) => {
+                    setStageDateTouched(true);
+                    setStageDate(e.target.value);
+                  }}
+                />
+              </Field>
+            )}
+          </div>
 
           {!isEdit && (
             <p className="text-xs text-muted-foreground">

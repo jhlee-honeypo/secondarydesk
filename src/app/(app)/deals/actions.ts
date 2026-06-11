@@ -75,6 +75,8 @@ async function createInvestorInline(
       investor_id: investorId,
       name: contactName,
       title: text(fd, "contact_title"),
+      email: text(fd, "contact_email"),
+      phone: text(fd, "contact_phone"),
     });
   }
 
@@ -224,7 +226,7 @@ export async function createDeal(
   const { data: inserted, error } = await supabase
     .from("deals")
     .insert(payloads)
-    .select("listing_id");
+    .select("id");
 
   if (error) {
     if (error.code === "23505") {
@@ -234,6 +236,23 @@ export async function createDeal(
       };
     }
     return { ok: false, error: error.message };
+  }
+
+  // 단계 진입 일자(과거 딜 입력 시) — 트리거가 생성 직후 만든 최초 단계 이력의
+  // changed_at(기본 now())을 지정 일자로 덮어쓴다. 생성 직후엔 딜마다 이력이
+  // 1건뿐이라 deal_id 매칭만으로 안전하다. TZ 무관하게 안전한 정오(UTC)로 저장.
+  const stageDate = text(fd, "stage_date");
+  if (
+    stageDate &&
+    /^\d{4}-\d{2}-\d{2}$/.test(stageDate) &&
+    inserted &&
+    inserted.length > 0
+  ) {
+    const ids = inserted.map((d) => d.id as string);
+    await supabase
+      .from("deal_stage_events")
+      .update({ changed_at: `${stageDate}T12:00:00+00:00` })
+      .in("deal_id", ids);
   }
 
   revalidatePath("/deals");
@@ -302,7 +321,13 @@ export type InvestorEditData = {
     met_date: string | null;
     description: string | null;
   };
-  contact: { id: string; name: string; title: string | null } | null;
+  contact: {
+    id: string;
+    name: string;
+    title: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
   funds: {
     id: string;
     name: string;
@@ -326,7 +351,7 @@ export async function getInvestorEditData(
         .single(),
       supabase
         .from("contacts")
-        .select("id, name, title")
+        .select("id, name, title, email, phone")
         .eq("investor_id", investorId)
         .order("created_at", { ascending: true })
         .limit(1),
@@ -459,8 +484,15 @@ export async function updateDeal(
     const contactId = text(fd, "contact_id");
     const contactName = text(fd, "contact_name");
     if (contactId) {
-      const contactUpd: { title: string | null; name?: string } = {
+      const contactUpd: {
+        title: string | null;
+        email: string | null;
+        phone: string | null;
+        name?: string;
+      } = {
         title: text(fd, "contact_title"),
+        email: text(fd, "contact_email"),
+        phone: text(fd, "contact_phone"),
       };
       if (contactName) contactUpd.name = contactName;
       await supabase.from("contacts").update(contactUpd).eq("id", contactId);
@@ -469,6 +501,8 @@ export async function updateDeal(
         investor_id: investorId,
         name: contactName,
         title: text(fd, "contact_title"),
+        email: text(fd, "contact_email"),
+        phone: text(fd, "contact_phone"),
       });
     }
 

@@ -116,6 +116,27 @@ export function DealBoard({
   const filterActive =
     listingFilter !== ALL || ownerFilter !== ALL || fundFilter !== ALL;
 
+  // 매물 필터 드롭다운 후보 — 펀드가 선택돼 있으면 그 펀드 소속 매물만 노출.
+  const listingsForFilter =
+    fundFilter === ALL
+      ? listings
+      : listings.filter((l) =>
+          (listingFundMap[l.id] ?? []).includes(fundFilter),
+        );
+
+  // 펀드 필터 변경 시, 선택돼 있던 매물이 새 펀드에 속하지 않으면 매물 필터 해제
+  // (드롭다운 후보에서 사라진 값이 그대로 남는 것 방지).
+  function handleFundFilterChange(next: string) {
+    setFundFilter(next);
+    if (
+      next !== ALL &&
+      listingFilter !== ALL &&
+      !(listingFundMap[listingFilter] ?? []).includes(next)
+    ) {
+      setListingFilter(ALL);
+    }
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
@@ -177,7 +198,7 @@ export function DealBoard({
       {/* 필터 행 + 딜 생성 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={fundFilter} onValueChange={setFundFilter}>
+          <Select value={fundFilter} onValueChange={handleFundFilterChange}>
             <SelectTrigger className="w-44" aria-label="운용펀드 필터">
               <SelectValue placeholder="운용펀드" />
             </SelectTrigger>
@@ -197,7 +218,7 @@ export function DealBoard({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>전체 매물</SelectItem>
-              {listings.map((l) => (
+              {listingsForFilter.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.company_name}
                 </SelectItem>
@@ -232,6 +253,7 @@ export function DealBoard({
           />
           <DealFormDialog
             {...dialogOptions}
+            initialFundFilter={fundFilter}
             trigger={
               <Button>
                 <Plus />딜
