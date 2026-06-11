@@ -41,7 +41,7 @@ import {
   type DealOptionInvestor,
   type DealOptionListing,
 } from "./deal-form-dialog";
-import { deleteDeal, updateDealStage } from "../actions";
+import { deleteDeal, updateDealStage, type ListingBundle } from "../actions";
 
 const ALL = "all";
 const VIEWS_KEY = "secondarydesk:deal-views";
@@ -57,6 +57,7 @@ export function DealBoard({
   currentUserId,
   holdingFunds,
   listingFundMap,
+  listingBundles,
 }: {
   initialDeals: DealCard[];
   listings: DealOptionListing[];
@@ -66,6 +67,7 @@ export function DealBoard({
   currentUserId: string;
   holdingFunds: { id: string; name: string }[];
   listingFundMap: Record<string, string[]>;
+  listingBundles: ListingBundle[];
 }) {
   const [deals, setDeals] = useState(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -191,6 +193,7 @@ export function DealBoard({
     currentUserId,
     holdingFunds,
     listingFundMap,
+    listingBundles,
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { Plus, Star, X } from "lucide-react";
 
 import {
   Dialog,
@@ -36,10 +36,13 @@ import { InvestorPicker, todayLocal } from "@/components/app/investor-picker";
 import { StageHistoryEditor } from "./stage-history-editor";
 import {
   createDeal,
+  deleteListingBundle,
   getInvestorEditData,
+  saveListingBundle,
   updateDeal,
   type ActionResult,
   type InvestorEditData,
+  type ListingBundle,
 } from "../actions";
 
 export type DealOptionListing = { id: string; company_name: string };
@@ -60,6 +63,7 @@ function ListingMultiSelect({
   holdingFunds = [],
   listingFundMap = {},
   initialFund = FUND_ALL,
+  bundles: initialBundles = [],
 }: {
   listings: DealOptionListing[];
   value: string[];
@@ -68,6 +72,8 @@ function ListingMultiSelect({
   listingFundMap?: Record<string, string[]>;
   /** 보드에서 넘어온 펀드 필터 — 다이얼로그 열릴 때 운용펀드 구분 기본값. */
   initialFund?: string;
+  /** 매물 즐겨찾기 묶음(팀 공유). 서버에서 로드한 초기값. */
+  bundles?: ListingBundle[];
 }) {
   const [q, setQ] = useState("");
   const [fund, setFund] = useState(initialFund);
@@ -79,10 +85,50 @@ function ListingMultiSelect({
     return byFund && byText;
   });
 
+  // 즐겨찾기 묶음(저장/적용/삭제). 초기값은 props, 이후 낙관적으로 로컬 관리.
+  const [bundles, setBundles] = useState<ListingBundle[]>(initialBundles);
+  const [bundleName, setBundleName] = useState("");
+  const [bundleMsg, setBundleMsg] = useState<string | null>(null);
+  const [bundleSaving, startBundleSave] = useTransition();
+  const listingIdSet = new Set(listings.map((l) => l.id));
+
   function toggle(id: string) {
     onChange(
       value.includes(id) ? value.filter((v) => v !== id) : [...value, id],
     );
+  }
+
+  // 묶음 적용 — 현재 선택에 묶음의 매물을 더한다(이미 삭제된 매물 id는 무시).
+  function applyBundle(b: ListingBundle) {
+    const avail = b.listing_ids.filter((id) => listingIdSet.has(id));
+    onChange([...new Set([...value, ...avail])]);
+  }
+
+  function handleSaveBundle() {
+    const name = bundleName.trim();
+    if (!name || value.length === 0) return;
+    setBundleMsg(null);
+    startBundleSave(async () => {
+      const res = await saveListingBundle(name, value);
+      if (!res.ok) {
+        setBundleMsg(res.error);
+        return;
+      }
+      // 같은 이름이면 교체, 아니면 추가
+      setBundles((prev) => [
+        ...prev.filter((b) => b.id !== res.bundle.id && b.name !== res.bundle.name),
+        res.bundle,
+      ]);
+      setBundleName("");
+      setBundleMsg(`‘${name}’ 묶음을 저장했습니다.`);
+    });
+  }
+
+  function handleDeleteBundle(id: string) {
+    setBundles((prev) => prev.filter((b) => b.id !== id)); // 낙관적 제거
+    startBundleSave(async () => {
+      await deleteListingBundle(id);
+    });
   }
 
   return (
@@ -90,6 +136,81 @@ function ListingMultiSelect({
       {value.map((id) => (
         <input key={id} type="hidden" name="listing_ids" value={id} />
       ))}
+
+      {/* 즐겨찾기 묶음 — 자주 함께 내보내는 매물 조합을 저장/적용 */}
+      <div className="space-y-2 rounded-lg border border-dashed border-border p-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Star className="size-3.5" />
+          즐겨찾기 묶음
+        </div>
+        {bundles.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {bundles.map((b) => {
+              const availCount = b.listing_ids.filter((id) =>
+                listingIdSet.has(id),
+              ).length;
+              return (
+                <span
+                  key={b.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-card py-0.5 pl-2.5 pr-1 text-xs"
+                >
+                  <button
+                    type="button"
+                    className="font-medium hover:text-primary"
+                    onClick={() => applyBundle(b)}
+                    title="이 묶음의 매물을 선택에 추가"
+                  >
+                    {b.name}
+                    <span className="ml-1 text-muted-foreground">
+                      {availCount}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${b.name} 묶음 삭제`}
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => handleDeleteBundle(b.id)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            저장된 묶음이 없습니다. 매물을 고른 뒤 아래에서 저장하세요.
+          </p>
+        )}
+        {value.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Input
+              value={bundleName}
+              onChange={(e) => setBundleName(e.target.value)}
+              placeholder={`현재 선택 ${value.length}개를 묶음 이름으로 저장`}
+              className="h-7 text-xs"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSaveBundle();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              disabled={!bundleName.trim() || bundleSaving}
+              onClick={handleSaveBundle}
+            >
+              저장
+            </Button>
+          </div>
+        )}
+        {bundleMsg && (
+          <p className="text-xs text-muted-foreground">{bundleMsg}</p>
+        )}
+      </div>
       {holdingFunds.length > 0 && (
         <Select value={fund} onValueChange={setFund}>
           <SelectTrigger aria-label="운용펀드로 구분">
@@ -339,6 +460,7 @@ export function DealFormDialog({
   holdingFunds,
   listingFundMap,
   initialFundFilter,
+  listingBundles,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
 }: {
@@ -357,6 +479,8 @@ export function DealFormDialog({
   listingFundMap?: Record<string, string[]>;
   /** 보드의 활성 펀드 필터 — 생성 시 매물 복수선택의 운용펀드 구분 기본값으로 사용. */
   initialFundFilter?: string;
+  /** 매물 즐겨찾기 묶음(팀 공유, 서버 로드) — 생성 시 매물 복수선택에서 적용/저장. */
+  listingBundles?: ListingBundle[];
   /** 제어형(controlled) 사용: 부모가 열림 상태를 보유. (칸반 카드 클릭 등) */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -456,6 +580,7 @@ export function DealFormDialog({
         holdingFunds={holdingFunds}
         listingFundMap={listingFundMap}
         initialFund={initialFundFilter}
+        bundles={listingBundles}
       />
     </Field>
   ) : (

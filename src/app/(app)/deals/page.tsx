@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/supabase/auth";
 import type { DealCard, UserRow } from "@/lib/types";
 import { fundLabel } from "@/lib/format";
 import { DealBoard } from "./_components/deal-board";
+import { listListingBundles } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export default async function DealsPage() {
     supabase.from("holding_funds").select("id, name, short_name").order("name"),
     supabase.from("listing_funds").select("listing_id, holding_fund_id"),
   ]);
+
+  const listingBundles = await listListingBundles();
 
   const deals = (dealRows ?? []) as DealCard[];
   const listings = (listingRows ?? []) as { id: string; company_name: string }[];
@@ -81,6 +84,7 @@ export default async function DealsPage() {
         currentUserId={me?.id ?? ""}
         holdingFunds={holdingFunds}
         listingFundMap={listingFundMap}
+        listingBundles={listingBundles}
       />
     </div>
   );

@@ -263,6 +263,77 @@ export async function createDeal(
   return { ok: true, created: inserted?.length ?? toCreate.length, skipped };
 }
 
+// ---- 매물 즐겨찾기 묶음 (딜 생성 복수선택용, 팀 공유) ----------------------
+
+export type ListingBundle = { id: string; name: string; listing_ids: string[] };
+
+export async function listListingBundles(): Promise<ListingBundle[]> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("listing_bundles")
+      .select("id, name, listing_ids")
+      .order("name");
+    if (error || !data) return [];
+    return data as ListingBundle[];
+  } catch {
+    // 테이블 미생성(마이그레이션 미적용) 등 → 조용히 빈 목록
+    return [];
+  }
+}
+
+// 같은 이름이면 매물 목록을 갱신(덮어쓰기), 없으면 신규 생성.
+export async function saveListingBundle(
+  name: string,
+  listingIds: string[],
+): Promise<{ ok: true; bundle: ListingBundle } | { ok: false; error: string }> {
+  const n = (name ?? "").trim();
+  if (!n) return { ok: false, error: "묶음 이름을 입력하세요." };
+  const ids = [...new Set((listingIds ?? []).filter(Boolean))];
+  if (ids.length === 0) return { ok: false, error: "매물을 선택하세요." };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("listing_bundles")
+    .select("id")
+    .eq("name", n)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from("listing_bundles")
+      .update({ listing_ids: ids })
+      .eq("id", existing.id as string)
+      .select("id, name, listing_ids")
+      .single();
+    if (error || !data) return { ok: false, error: error?.message ?? "저장 실패" };
+    revalidatePath("/deals");
+    return { ok: true, bundle: data as ListingBundle };
+  }
+
+  const me = await getCurrentUser();
+  const { data, error } = await supabase
+    .from("listing_bundles")
+    .insert({ name: n, listing_ids: ids, created_by: me?.id ?? null })
+    .select("id, name, listing_ids")
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? "저장 실패" };
+  revalidatePath("/deals");
+  return { ok: true, bundle: data as ListingBundle };
+}
+
+export async function deleteListingBundle(
+  id: string,
+): Promise<{ ok: boolean }> {
+  if (!id) return { ok: false };
+  const supabase = await createClient();
+  const { error } = await supabase.from("listing_bundles").delete().eq("id", id);
+  if (error) return { ok: false };
+  revalidatePath("/deals");
+  return { ok: true };
+}
+
 // ---- 적합도 추천에서 딜 1클릭 생성 (F7) ------------------------------------
 
 export async function createDealFromMatch(
