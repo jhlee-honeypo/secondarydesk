@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DeleteDialog } from "@/components/app/delete-dialog";
+import { SearchableSelect } from "@/components/app/searchable-select";
 import { MeetingLogDialog } from "../../activities/_components/meeting-log-dialog";
 import {
   DealFormDialog,
@@ -215,19 +216,22 @@ export function DealBoard({
             </SelectContent>
           </Select>
 
-          <Select value={listingFilter} onValueChange={setListingFilter}>
-            <SelectTrigger className="w-48" aria-label="매물 필터">
-              <SelectValue placeholder="매물" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL}>전체 매물</SelectItem>
-              {listingsForFilter.map((l) => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.company_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            ariaLabel="매물 필터"
+            triggerClassName="w-48"
+            value={listingFilter}
+            onValueChange={setListingFilter}
+            placeholder="매물"
+            searchPlaceholder="매물명 검색…"
+            emptyText="매물 없음"
+            options={[
+              { value: ALL, label: "전체 매물" },
+              ...listingsForFilter.map((l) => ({
+                value: l.id,
+                label: l.company_name,
+              })),
+            ]}
+          />
 
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
             <SelectTrigger className="w-44" aria-label="담당자 필터">

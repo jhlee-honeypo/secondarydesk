@@ -4,8 +4,8 @@ import { Contact, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { InvestorWithOwner } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { InvestorTable } from "./_components/investor-table";
 
 export const dynamic = "force-dynamic";
 
@@ -53,44 +53,7 @@ export default async function InvestorsPage() {
           </p>
         </Card>
       ) : (
-        <Card className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 font-medium">투자사명</th>
-                <th className="px-4 py-2.5 font-medium">유형</th>
-                <th className="px-4 py-2.5 font-medium">담당</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((inv) => (
-                <tr
-                  key={inv.id}
-                  className="border-b border-border last:border-0 hover:bg-muted/40"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/investors/${inv.id}`}
-                      className="font-medium text-foreground hover:text-primary hover:underline"
-                    >
-                      {inv.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    {inv.type ? (
-                      <Badge variant="outline">{inv.type}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {inv.owner?.name ?? inv.owner?.email ?? "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <InvestorTable rows={rows} />
       )}
     </div>
   );
