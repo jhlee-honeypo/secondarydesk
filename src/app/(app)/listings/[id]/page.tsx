@@ -13,7 +13,7 @@ import {
   type ListingWithFunds,
   type UserRow,
 } from "@/lib/types";
-import { formatDate, formatKRW, formatWon } from "@/lib/format";
+import { formatDate, formatKRW, formatWon, fundLabel } from "@/lib/format";
 import { computeTotals } from "@/lib/exit-scenario";
 import { rankFundsForListing, type FundWithInvestor } from "@/lib/match";
 import { Badge } from "@/components/ui/badge";
@@ -33,10 +33,20 @@ export const dynamic = "force-dynamic";
 
 export default async function ListingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string; fund?: string }>;
 }) {
   const { id } = await params;
+  const { status = "", fund = "" } = await searchParams;
+  // 목록에서 넘어올 때 실린 필터를 "← 매물 목록" 복귀 링크에 다시 싣는다.
+  const backParams = new URLSearchParams();
+  if (status) backParams.set("status", status);
+  if (fund) backParams.set("fund", fund);
+  const backHref = backParams.toString()
+    ? `/listings?${backParams.toString()}`
+    : "/listings";
   const supabase = await createClient();
 
   const me = await getCurrentUser();
@@ -51,7 +61,9 @@ export default async function ListingDetailPage({
   ] = await Promise.all([
     supabase
       .from("listings")
-      .select("*, listing_funds(holding_fund_id, holding_funds(id, name))")
+      .select(
+        "*, listing_funds(holding_fund_id, holding_funds(id, name, short_name))",
+      )
       .eq("id", id)
       .single(),
     supabase.from("holding_funds").select("*").order("name"),
@@ -70,7 +82,7 @@ export default async function ListingDetailPage({
     supabase.from("users").select("id, name, email, role").order("name"),
     supabase
       .from("exit_scenario_rounds")
-      .select("round_no, label, amount, unit_price, shares")
+      .select("round_no, label, amount, unit_price, shares, holding_fund_id")
       .eq("listing_id", id)
       .order("round_no", { ascending: true }),
   ]);
@@ -82,7 +94,10 @@ export default async function ListingDetailPage({
   const selectedFundIds = listing.listing_funds.map((lf) => lf.holding_fund_id);
   const memberFunds = listing.listing_funds
     .map((lf) => lf.holding_funds)
-    .filter((f): f is { id: string; name: string } => Boolean(f));
+    .filter(
+      (f): f is { id: string; name: string; short_name: string | null } =>
+        Boolean(f),
+    );
 
   const deals = (dealRows ?? []) as DealCard[];
   const allFunds = (investorFundRows ?? []) as FundWithInvestor[];
@@ -94,6 +109,7 @@ export default async function ListingDetailPage({
     amount: number;
     unit_price: number;
     shares: number;
+    holding_fund_id: string | null;
   }[];
   const roundTotals = computeTotals(
     rounds.map((r) => ({
@@ -102,6 +118,9 @@ export default async function ListingDetailPage({
       shares: r.shares || 0,
     })),
   );
+  // 라운드 소속 펀드 id → 이름
+  const fundNameById = new Map(holdingFunds.map((f) => [f.id, fundLabel(f)]));
+  const showRoundFund = rounds.some((r) => r.holding_fund_id);
 
   // 이 매물로 잠긴 딜 다이얼로그 옵션(투자사는 선택 가능 → 전체 목록·전체 조합 전달)
   const dealDialogProps = {
@@ -128,7 +147,7 @@ export default async function ListingDetailPage({
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <Link
-        href="/listings"
+        href={backHref}
         className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← 매물 목록
@@ -269,6 +288,9 @@ export default async function ListingDetailPage({
                         <thead>
                           <tr className="border-b border-border text-left text-xs text-muted-foreground">
                             <th className="px-3 py-2 font-medium">라운드</th>
+                            {showRoundFund && (
+                              <th className="px-3 py-2 font-medium">펀드</th>
+                            )}
                             <th className="px-3 py-2 text-right font-medium">
                               투자 단가 (원/주)
                             </th>
@@ -289,6 +311,13 @@ export default async function ListingDetailPage({
                               <td className="px-3 py-2">
                                 {r.label || `${i + 1}차`}
                               </td>
+                              {showRoundFund && (
+                                <td className="px-3 py-2 text-muted-foreground">
+                                  {(r.holding_fund_id &&
+                                    fundNameById.get(r.holding_fund_id)) ||
+                                    "—"}
+                                </td>
+                              )}
                               <td className="px-3 py-2 text-right tabular-nums">
                                 {formatWon(r.unit_price)}
                               </td>
@@ -326,8 +355,13 @@ export default async function ListingDetailPage({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {memberFunds.map((f) => (
-                  <Badge key={f.id} variant="secondary" className="text-sm">
-                    {f.name}
+                  <Badge
+                    key={f.id}
+                    variant="secondary"
+                    className="text-sm"
+                    title={f.name}
+                  >
+                    {fundLabel(f)}
                   </Badge>
                 ))}
               </div>

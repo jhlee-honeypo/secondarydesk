@@ -3,6 +3,7 @@ import { FileUp, Layers, Plus } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { type HoldingFund, type ListingWithFunds } from "@/lib/types";
+import { fundLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -43,7 +44,7 @@ export default async function ListingsPage({
     let query = supabase
       .from("listings")
       .select(
-        "*, listing_funds(holding_fund_id, holding_funds(id, name))",
+        "*, listing_funds(holding_fund_id, holding_funds(id, name, short_name))",
       )
       .order("company_name");
 
@@ -53,6 +54,12 @@ export default async function ListingsPage({
     const { data } = await query;
     listings = (data ?? []) as ListingWithFunds[];
   }
+
+  // 상세로 이동할 때 현재 필터를 쿼리로 실어 보내, 돌아올 때 유지되게 한다.
+  const qsParams = new URLSearchParams();
+  if (status) qsParams.set("status", status);
+  if (fund) qsParams.set("fund", fund);
+  const detailQuery = qsParams.toString() ? `?${qsParams.toString()}` : "";
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -112,7 +119,7 @@ export default async function ListingsPage({
             <tbody>
               {listings.map((listing) => {
                 const fundNames = listing.listing_funds
-                  .map((lf) => lf.holding_funds?.name)
+                  .map((lf) => (lf.holding_funds ? fundLabel(lf.holding_funds) : null))
                   .filter(Boolean) as string[];
                 return (
                   <tr
@@ -121,7 +128,7 @@ export default async function ListingsPage({
                   >
                     <td className="px-4 py-3">
                       <Link
-                        href={`/listings/${listing.id}`}
+                        href={`/listings/${listing.id}${detailQuery}`}
                         className="font-medium text-foreground hover:text-primary hover:underline"
                       >
                         {listing.company_name}

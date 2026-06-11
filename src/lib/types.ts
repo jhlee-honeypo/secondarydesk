@@ -172,6 +172,7 @@ export type Listing = {
   sector: string | null;
   stage: string | null;
   asking_valuation: number | null;
+  latest_round_price: number | null; // 최신(후속) 라운드 단가(원/주) — EXIT 기준
   summary: string | null;
   deck_url: string | null;
   created_at: string;
@@ -182,6 +183,7 @@ export type Listing = {
 export type HoldingFund = {
   id: string;
   name: string;
+  short_name: string | null; // 약칭 — 화면 표시용(없으면 name 폴백)
   vintage: number | null;
   maturity_date: string | null;
   status: HoldingFundStatus | null;
@@ -194,7 +196,7 @@ export type HoldingFund = {
 export type ListingWithFunds = Listing & {
   listing_funds: {
     holding_fund_id: string;
-    holding_funds: { id: string; name: string } | null;
+    holding_funds: { id: string; name: string; short_name: string | null } | null;
   }[];
 };
 
@@ -290,6 +292,7 @@ export type ExitScenarioRound = {
   amount: number;
   unit_price: number;
   shares: number;
+  holding_fund_id: string | null;
 };
 
 // §4.8 Activity.type

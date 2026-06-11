@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Bookmark, CalendarPlus, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, Bookmark, CalendarPlus, Plus, Trash2, X } from "lucide-react";
 
 import {
   DEAL_STAGES,
@@ -474,17 +474,24 @@ function DealCardView({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border bg-card p-3 text-sm shadow-xs",
+        "group rounded-lg border border-border bg-card text-sm shadow-xs",
         dragging && "cursor-grabbing shadow-md",
       )}
     >
-      <div className="flex items-start justify-between gap-1">
-        <p className="font-medium leading-tight">
-          {deal.listing?.company_name ?? "—"}
-        </p>
+      {/* 헤더(항상 표시): 매물명 → 투자사명 */}
+      <div className="flex items-center gap-1.5 px-3 py-2">
+        <span className="min-w-0 flex-1 truncate leading-tight">
+          <span className="font-medium text-foreground">
+            {deal.listing?.company_name ?? "—"}
+          </span>
+          <ArrowRight className="mx-1 inline-block size-3 align-middle text-muted-foreground/40" />
+          <span className="text-muted-foreground">
+            {deal.investor?.name ?? "—"}
+          </span>
+        </span>
         {dialogOptions && (
           <div
-            className="flex shrink-0 items-center gap-0.5"
+            className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -501,40 +508,44 @@ function DealCardView({
           </div>
         )}
       </div>
-      <p className="mt-0.5 text-muted-foreground">{deal.investor?.name ?? "—"}</p>
 
-      <div className="mt-2 flex items-center justify-end text-xs text-muted-foreground">
-        <span>
-          {deal.owner?.first_name ??
-            deal.owner?.name ??
-            deal.owner?.email ??
-            "—"}
-        </span>
-      </div>
+      {/* 상세(호버 시 높이가 부드럽게 펼쳐짐 — grid-rows 0fr→1fr) */}
+      <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out group-hover:grid-rows-[1fr]">
+        <div className="overflow-hidden">
+          <div className="px-3 pb-3">
+            <div className="flex items-center justify-end text-xs text-muted-foreground">
+              <span>
+                {deal.owner?.first_name ??
+                  deal.owner?.name ??
+                  deal.owner?.email ??
+                  "—"}
+              </span>
+            </div>
 
-      {deal.next_action && (
-        <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 text-xs">
-          {overdue && (
-            <span
-              className="size-1.5 shrink-0 rounded-full bg-destructive"
-              aria-label="기한 경과"
-            />
-          )}
-          <span
-            className={cn(
-              "truncate",
-              overdue ? "text-destructive" : "text-muted-foreground",
+            {deal.next_action && (
+              <div className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 text-xs">
+                {overdue && (
+                  <span
+                    className="size-1.5 shrink-0 rounded-full bg-destructive"
+                    aria-label="기한 경과"
+                  />
+                )}
+                <span
+                  className={cn(
+                    "truncate",
+                    overdue ? "text-destructive" : "text-muted-foreground",
+                  )}
+                >
+                  {deal.next_action}
+                  {deal.next_action_date &&
+                    ` · ${formatDate(deal.next_action_date)}`}
+                </span>
+              </div>
             )}
-          >
-            {deal.next_action}
-            {deal.next_action_date && ` · ${formatDate(deal.next_action_date)}`}
-          </span>
-        </div>
-      )}
 
-      {/* 단계 이력 미니 타임라인 — 단계가 바뀔 때마다 진입일 누적 */}
-      {stageHistory.length > 0 && (
-        <div className="mt-2 space-y-1 border-t border-border pt-2">
+            {/* 단계 이력 미니 타임라인 — 단계가 바뀔 때마다 진입일 누적 */}
+            {stageHistory.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-border pt-2">
           {stageHistory.map((ev, i) => {
             const isCurrent = i === stageHistory.length - 1;
             return (
@@ -565,8 +576,11 @@ function DealCardView({
               </div>
             );
           })}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

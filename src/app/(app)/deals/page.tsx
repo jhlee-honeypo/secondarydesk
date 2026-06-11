@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import type { DealCard, UserRow } from "@/lib/types";
+import { fundLabel } from "@/lib/format";
 import { DealBoard } from "./_components/deal-board";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function DealsPage() {
       .from("users")
       .select("id, name, email, first_name, last_name, role")
       .order("name"),
-    supabase.from("holding_funds").select("id, name").order("name"),
+    supabase.from("holding_funds").select("id, name, short_name").order("name"),
     supabase.from("listing_funds").select("listing_id, holding_fund_id"),
   ]);
 
@@ -44,7 +45,14 @@ export default async function DealsPage() {
     investor_id: string;
   }[];
   const users = (userRows ?? []) as UserRow[];
-  const holdingFunds = (holdingFundRows ?? []) as { id: string; name: string }[];
+  // 화면 표시는 약칭 우선(없으면 전체명)
+  const holdingFunds = (
+    (holdingFundRows ?? []) as {
+      id: string;
+      name: string;
+      short_name: string | null;
+    }[]
+  ).map((f) => ({ id: f.id, name: fundLabel(f) }));
 
   // 매물 → 소속 운용펀드 id 목록 매핑(딜 보드 필터·딜 생성 매물 그룹핑용)
   const listingFundMap: Record<string, string[]> = {};

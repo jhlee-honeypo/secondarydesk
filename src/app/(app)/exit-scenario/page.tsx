@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fundLabel } from "@/lib/format";
 import { ExitScenarioTool } from "./_components/exit-scenario-tool";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,22 @@ export default async function ExitScenarioPage() {
   const [{ data: listingRows }, { data: holdingFundRows }, { data: lfRows }] =
     await Promise.all([
       supabase.from("listings").select("id, company_name").order("company_name"),
-      supabase.from("holding_funds").select("id, name").order("name"),
+      supabase
+        .from("holding_funds")
+        .select("id, name, short_name")
+        .order("name"),
       supabase.from("listing_funds").select("listing_id, holding_fund_id"),
     ]);
 
   const listings = (listingRows ?? []) as { id: string; company_name: string }[];
-  const holdingFunds = (holdingFundRows ?? []) as { id: string; name: string }[];
+  // 화면 표시는 약칭 우선(없으면 전체명)
+  const holdingFunds = (
+    (holdingFundRows ?? []) as {
+      id: string;
+      name: string;
+      short_name: string | null;
+    }[]
+  ).map((f) => ({ id: f.id, name: fundLabel(f) }));
 
   // 매물 → 소속 운용펀드 id 목록 매핑(매물 선택 전 조합 필터용)
   const listingFundMap: Record<string, string[]> = {};

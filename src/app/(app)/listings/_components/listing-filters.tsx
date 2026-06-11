@@ -14,6 +14,7 @@ import {
   SELECTABLE_LISTING_STATUSES,
   type HoldingFund,
 } from "@/lib/types";
+import { fundLabel } from "@/lib/format";
 
 const ALL = "all";
 
@@ -40,6 +41,20 @@ export function ListingFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <Select value={fund || ALL} onValueChange={(v) => setParam("fund", v)}>
+        <SelectTrigger className="w-48" aria-label="운용펀드 필터">
+          <SelectValue placeholder="운용펀드" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>전체 운용펀드</SelectItem>
+          {holdingFunds.map((hf) => (
+            <SelectItem key={hf.id} value={hf.id}>
+              {fundLabel(hf)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       <Select
         value={status || ALL}
         onValueChange={(v) => setParam("status", v)}
@@ -52,20 +67,6 @@ export function ListingFilters({
           {SELECTABLE_LISTING_STATUSES.map((s) => (
             <SelectItem key={s} value={s}>
               {LISTING_STATUS_LABEL[s]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select value={fund || ALL} onValueChange={(v) => setParam("fund", v)}>
-        <SelectTrigger className="w-48" aria-label="운용펀드 필터">
-          <SelectValue placeholder="운용펀드" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>전체 운용펀드</SelectItem>
-          {holdingFunds.map((hf) => (
-            <SelectItem key={hf.id} value={hf.id}>
-              {hf.name}
             </SelectItem>
           ))}
         </SelectContent>

@@ -23,6 +23,14 @@ export function formatDate(value: string | null | undefined): string {
   return `${y}.${m}.${day}`;
 }
 
+/** 운용펀드 표시명 — 약칭 우선, 없으면 전체명. */
+export function fundLabel(
+  f: { name: string; short_name?: string | null } | null | undefined,
+): string {
+  if (!f) return "—";
+  return f.short_name?.trim() || f.name;
+}
+
 /** 원 금액을 한국식 천단위 구분자로(예: 316,263,200). null/비유한 → "—". */
 export function formatWon(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value))

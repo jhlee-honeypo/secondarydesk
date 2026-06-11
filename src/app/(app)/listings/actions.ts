@@ -63,6 +63,7 @@ type RoundRow = {
   amount: number;
   unit_price: number;
   shares: number;
+  holding_fund_id: string | null;
 };
 
 function parseRounds(fd: FormData): RoundRow[] {
@@ -70,11 +71,13 @@ function parseRounds(fd: FormData): RoundRow[] {
   const prices = fd.getAll("round_price");
   const sharesArr = fd.getAll("round_shares");
   const amounts = fd.getAll("round_amount");
+  const fundIds = fd.getAll("round_fund_id");
   const n = Math.max(
     labels.length,
     prices.length,
     sharesArr.length,
     amounts.length,
+    fundIds.length,
   );
 
   const rows: RoundRow[] = [];
@@ -84,7 +87,13 @@ function parseRounds(fd: FormData): RoundRow[] {
     const amt = digitsNum(amounts[i]);
     const amount = amt > 0 ? amt : unit_price * shares;
     if (unit_price > 0 || shares > 0 || amount > 0) {
-      rows.push({ label: entryStr(labels[i]), amount, unit_price, shares });
+      rows.push({
+        label: entryStr(labels[i]),
+        amount,
+        unit_price,
+        shares,
+        holding_fund_id: entryStr(fundIds[i]),
+      });
     }
   }
   return rows;
@@ -111,26 +120,39 @@ async function syncExitRounds(
       amount: r.amount,
       unit_price: r.unit_price,
       shares: r.shares,
+      holding_fund_id: r.holding_fund_id,
     })),
   );
   return insErr?.message ?? null;
 }
 
 /** 매물의 투자 라운드 조회(수정 폼 프리필 / EXIT 시나리오 화면). */
-export async function getListingRounds(
-  listingId: string,
-): Promise<
-  { ok: true; rounds: ExitScenarioRound[] } | { ok: false; error: string }
+export async function getListingRounds(listingId: string): Promise<
+  | { ok: true; rounds: ExitScenarioRound[]; latestPrice: number | null }
+  | { ok: false; error: string }
 > {
   if (!listingId) return { ok: false, error: "잘못된 요청입니다." };
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("exit_scenario_rounds")
-    .select("id, listing_id, round_no, label, amount, unit_price, shares")
-    .eq("listing_id", listingId)
-    .order("round_no", { ascending: true });
+  const [{ data, error }, { data: lst }] = await Promise.all([
+    supabase
+      .from("exit_scenario_rounds")
+      .select(
+        "id, listing_id, round_no, label, amount, unit_price, shares, holding_fund_id",
+      )
+      .eq("listing_id", listingId)
+      .order("round_no", { ascending: true }),
+    supabase
+      .from("listings")
+      .select("latest_round_price")
+      .eq("id", listingId)
+      .single(),
+  ]);
   if (error) return { ok: false, error: error.message };
-  return { ok: true, rounds: (data ?? []) as ExitScenarioRound[] };
+  return {
+    ok: true,
+    rounds: (data ?? []) as ExitScenarioRound[],
+    latestPrice: (lst?.latest_round_price ?? null) as number | null,
+  };
 }
 
 // ---- 매물 (Listing) --------------------------------------------------------
@@ -144,6 +166,7 @@ function listingPayload(fd: FormData) {
     sector: text(fd, "sector"),
     stage: text(fd, "stage"),
     deck_url: text(fd, "deck_url"),
+    latest_round_price: num(fd, "latest_round_price"),
   };
 }
 
@@ -283,6 +306,7 @@ export async function deleteListing(id: string): Promise<void> {
 function holdingFundPayload(fd: FormData) {
   return {
     name: requiredText(fd, "name"),
+    short_name: text(fd, "short_name"),
     vintage: intNum(fd, "vintage"),
     maturity_date: text(fd, "maturity_date"),
     status: text(fd, "status"),

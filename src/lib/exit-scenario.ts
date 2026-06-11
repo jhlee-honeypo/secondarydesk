@@ -30,12 +30,19 @@ export type ProjectionRow = {
   isBreakevenNearest: boolean; // 손익분기 할인율에 가장 근접한 행
 };
 
-export function computeTotals(rounds: RoundInput[]): ScenarioTotals {
+export function computeTotals(
+  rounds: RoundInput[],
+  /** 최신(후속) 라운드 단가. 양수면 기준단가로 우선 사용. */
+  basePriceOverride?: number | null,
+): ScenarioTotals {
   const totalPrincipal = rounds.reduce((s, r) => s + (r.amount || 0), 0);
   const totalShares = rounds.reduce((s, r) => s + (r.shares || 0), 0);
-  // 기준단가: 마지막(최종) 라운드의 단가. 라운드가 없으면 0.
+  // 기준단가: 최신 라운드 단가(입력 시) → 없으면 마지막 투자 라운드 단가.
   const last = rounds[rounds.length - 1];
-  const baseUnitPrice = last?.unitPrice || 0;
+  const baseUnitPrice =
+    basePriceOverride && basePriceOverride > 0
+      ? basePriceOverride
+      : last?.unitPrice || 0;
 
   const avgUnitPrice = totalShares > 0 ? totalPrincipal / totalShares : 0;
   const breakevenPrice = avgUnitPrice;

@@ -6,7 +6,7 @@ import {
   HOLDING_FUND_STATUS_VARIANT,
   type HoldingFund,
 } from "@/lib/types";
-import { formatDate } from "@/lib/format";
+import { formatDate, fundLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -82,7 +82,14 @@ export default async function HoldingFundsPage() {
                   key={fund.id}
                   className="border-b border-border last:border-0 hover:bg-muted/40"
                 >
-                  <td className="px-4 py-3 font-medium">{fund.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{fundLabel(fund)}</div>
+                    {fund.short_name && (
+                      <div className="text-xs text-muted-foreground">
+                        {fund.name}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {fund.status ? (
                       <Badge variant={HOLDING_FUND_STATUS_VARIANT[fund.status]}>

@@ -31,6 +31,7 @@ import {
   type Listing,
 } from "@/lib/types";
 import { Field } from "@/components/app/field";
+import { fundLabel } from "@/lib/format";
 import {
   createListing,
   getListingRounds,
@@ -63,6 +64,14 @@ export function ListingFormDialog({
   );
   const [roundsLoading, setRoundsLoading] = useState(false);
 
+  // 소속 운용펀드 태깅(제어형) — 라운드 에디터의 "소속 펀드" 선택지로 전달.
+  const [fundIds, setFundIds] = useState<string[]>(selectedFundIds);
+  const taggedFunds = holdingFunds
+    .filter((hf) => fundIds.includes(hf.id))
+    .map((hf) => ({ id: hf.id, name: fundLabel(hf) }));
+  // 태깅 펀드가 1개면 신규 라운드 기본 소속 펀드로 사용.
+  const defaultFundId = fundIds.length === 1 ? fundIds[0] : null;
+
   useEffect(() => {
     if (state?.ok) setOpen(false);
   }, [state]);
@@ -81,6 +90,7 @@ export function ListingFormDialog({
               unit_price: r.unit_price,
               shares: r.shares,
               amount: r.amount,
+              holding_fund_id: r.holding_fund_id,
             }))
           : [],
       );
@@ -186,10 +196,21 @@ export function ListingFormDialog({
                       id={`hf-${hf.id}`}
                       name="holding_fund_ids"
                       value={hf.id}
-                      defaultChecked={selectedFundIds.includes(hf.id)}
+                      checked={fundIds.includes(hf.id)}
+                      onCheckedChange={(c) =>
+                        setFundIds((cur) =>
+                          c
+                            ? [...cur, hf.id]
+                            : cur.filter((x) => x !== hf.id),
+                        )
+                      }
                     />
-                    <Label htmlFor={`hf-${hf.id}`} className="font-normal">
-                      {hf.name}
+                    <Label
+                      htmlFor={`hf-${hf.id}`}
+                      className="font-normal"
+                      title={hf.name}
+                    >
+                      {fundLabel(hf)}
                     </Label>
                   </div>
                 ))}
@@ -203,7 +224,12 @@ export function ListingFormDialog({
               투자 데이터 불러오는 중…
             </div>
           ) : (
-            <RoundsEditor initial={roundsSeed ?? []} />
+            <RoundsEditor
+              initial={roundsSeed ?? []}
+              funds={taggedFunds}
+              defaultFundId={defaultFundId}
+              initialLatestPrice={listing?.latest_round_price ?? null}
+            />
           )}
 
           {state && !state.ok && (

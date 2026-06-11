@@ -64,15 +64,29 @@ export function HoldingFundFormDialog({
         <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={fund!.id} />}
 
-          <Field label="운용펀드명" htmlFor="hf-name" required>
-            <Input
-              id="hf-name"
-              name="name"
-              placeholder="스파크랩 N호"
-              defaultValue={fund?.name ?? ""}
-              required
-            />
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="운용펀드명(전체)" htmlFor="hf-name" required>
+              <Input
+                id="hf-name"
+                name="name"
+                placeholder="스파크랩 벤처스 N호 투자조합"
+                defaultValue={fund?.name ?? ""}
+                required
+              />
+            </Field>
+            <Field
+              label="약칭"
+              htmlFor="hf-short"
+              hint="화면에는 약칭이 표시됩니다."
+            >
+              <Input
+                id="hf-short"
+                name="short_name"
+                placeholder="스파크랩 N호"
+                defaultValue={fund?.short_name ?? ""}
+              />
+            </Field>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="결성연도(vintage)" htmlFor="hf-vintage">

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CalendarClock, Clock, UserX } from "lucide-react";
 
 import { loadNotifications } from "@/lib/notifications";
-import { formatDate } from "@/lib/format";
+import { formatDate, fundLabel } from "@/lib/format";
 import { DEAL_STAGE_VARIANT } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -92,7 +92,9 @@ export default async function NotificationsPage() {
                 href="/listings/funds"
                 className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 hover:bg-muted/40"
               >
-                <span className="text-sm font-medium">{f.name}</span>
+                <span className="text-sm font-medium" title={f.name}>
+                  {fundLabel(f)}
+                </span>
                 <span className="text-xs text-muted-foreground">
                   만기 {formatDate(f.maturity_date)}
                 </span>

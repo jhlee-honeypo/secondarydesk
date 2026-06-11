@@ -3,6 +3,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { DEAL_STAGES, type DealStage } from "@/lib/types";
+import { fundLabel } from "@/lib/format";
 
 export type FunnelRow = { stage: DealStage; count: number; amount: number };
 export type ListingProgressRow = {
@@ -82,7 +83,7 @@ export async function loadAnalytics({
   if (sinceStr) dealsQuery = dealsQuery.gte("created_at", sinceStr);
 
   const [{ data: hf }, dealsRes, actRes] = await Promise.all([
-    supabase.from("holding_funds").select("id, name").order("name"),
+    supabase.from("holding_funds").select("id, name, short_name").order("name"),
     dealsQuery,
     supabase
       .from("activities")
@@ -166,7 +167,9 @@ export async function loadAnalytics({
   ).length;
 
   return {
-    holdingFunds: (hf ?? []) as { id: string; name: string }[],
+    holdingFunds: (
+      (hf ?? []) as { id: string; name: string; short_name: string | null }[]
+    ).map((f) => ({ id: f.id, name: fundLabel(f) })),
     activeDealCount,
     expectedSum,
     avgCycleDays,

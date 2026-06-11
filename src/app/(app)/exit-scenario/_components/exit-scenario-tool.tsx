@@ -27,6 +27,7 @@ function friendlyError(msg: string): string {
 }
 
 const FUND_ALL = "all";
+const FUND_NONE = "__none__"; // 소속 펀드 미지정 라운드
 
 export function ExitScenarioTool({
   listings,
@@ -40,8 +41,16 @@ export function ExitScenarioTool({
   const [fundFilter, setFundFilter] = useState(FUND_ALL);
   const [listingId, setListingId] = useState("");
   const [rounds, setRounds] = useState<ExitScenarioRound[] | null>(null);
+  const [latestPrice, setLatestPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 결과를 특정 소속 펀드로 매칭(필터)할 때 사용. FUND_ALL = 전체 합산.
+  const [resultFund, setResultFund] = useState(FUND_ALL);
+
+  const fundName = (key: string) =>
+    key === FUND_NONE
+      ? "미지정"
+      : (holdingFunds.find((f) => f.id === key)?.name ?? "기타");
 
   const filteredListings = listings.filter(
     (l) =>
@@ -65,17 +74,22 @@ export function ExitScenarioTool({
   useEffect(() => {
     if (!listingId) {
       setRounds(null);
+      setLatestPrice(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setResultFund(FUND_ALL); // 매물 바꾸면 펀드 매칭 초기화
     getListingRounds(listingId).then((res) => {
       if (cancelled) return;
-      if (res.ok) setRounds(res.rounds);
-      else {
+      if (res.ok) {
+        setRounds(res.rounds);
+        setLatestPrice(res.latestPrice ?? null);
+      } else {
         setError(friendlyError(res.error));
         setRounds([]);
+        setLatestPrice(null);
       }
       setLoading(false);
     });
@@ -84,12 +98,24 @@ export function ExitScenarioTool({
     };
   }, [listingId]);
 
-  const calcRounds = (rounds ?? []).map((r) => ({
+  const allRounds = rounds ?? [];
+  // 라운드에 존재하는 소속 펀드 키 목록(미지정 포함). 2개 이상이면 펀드별 매칭 노출.
+  const fundKeys = Array.from(
+    new Set(allRounds.map((r) => r.holding_fund_id ?? FUND_NONE)),
+  );
+  const multiFund = fundKeys.length > 1;
+
+  const shownRounds =
+    resultFund === FUND_ALL
+      ? allRounds
+      : allRounds.filter((r) => (r.holding_fund_id ?? FUND_NONE) === resultFund);
+
+  const calcRounds = shownRounds.map((r) => ({
     amount: r.amount || 0,
     unitPrice: r.unit_price || 0,
     shares: r.shares || 0,
   }));
-  const totals = computeTotals(calcRounds);
+  const totals = computeTotals(calcRounds, latestPrice);
   const projection = computeProjection(totals);
   const hasScenario = totals.totalShares > 0 && totals.baseUnitPrice > 0;
 
@@ -162,6 +188,25 @@ export function ExitScenarioTool({
         </Card>
       ) : hasScenario ? (
         <>
+          {multiFund && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">펀드별 결과</span>
+              <Select value={resultFund} onValueChange={setResultFund}>
+                <SelectTrigger className="w-full sm:w-60" aria-label="펀드별 결과">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={FUND_ALL}>전체 합산</SelectItem>
+                  {fundKeys.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      {fundName(k)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <SummaryCards
             totals={totals}
             roundShares={calcRounds.map((r) => r.shares)}
