@@ -2,18 +2,13 @@ import Link from "next/link";
 import { FileUp, Layers, Plus } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import {
-  LISTING_STATUS_LABEL,
-  LISTING_STATUS_VARIANT,
-  type HoldingFund,
-  type ListingWithFunds,
-} from "@/lib/types";
-import { formatKRW } from "@/lib/format";
+import { type HoldingFund, type ListingWithFunds } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ListingFormDialog } from "./_components/listing-form-dialog";
 import { ListingFilters } from "./_components/listing-filters";
+import { SectorCell, StatusCell } from "./_components/listing-inline-edit";
 
 export const dynamic = "force-dynamic";
 
@@ -109,8 +104,8 @@ export default async function ListingsPage({
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-4 py-2.5 font-medium">회사명</th>
+                <th className="px-4 py-2.5 font-medium">섹터</th>
                 <th className="px-4 py-2.5 font-medium">상태</th>
-                <th className="px-4 py-2.5 font-medium">최신 밸류</th>
                 <th className="px-4 py-2.5 font-medium">소속 운용펀드</th>
               </tr>
             </thead>
@@ -131,19 +126,12 @@ export default async function ListingsPage({
                       >
                         {listing.company_name}
                       </Link>
-                      {listing.sector && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {listing.sector}
-                        </span>
-                      )}
                     </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={LISTING_STATUS_VARIANT[listing.status]}>
-                        {LISTING_STATUS_LABEL[listing.status]}
-                      </Badge>
+                    <td className="px-4 py-2">
+                      <SectorCell id={listing.id} value={listing.sector} />
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatKRW(listing.asking_valuation)}
+                    <td className="px-4 py-2">
+                      <StatusCell id={listing.id} value={listing.status} />
                     </td>
                     <td className="px-4 py-3">
                       {fundNames.length === 0 ? (

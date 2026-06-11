@@ -8,6 +8,7 @@ export type Profile = {
   name: string | null;
   email: string | null;
   role: UserRole;
+  approved: boolean;
 };
 
 export type CurrentUser = {
@@ -34,7 +35,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, name, email, role")
+    .select("id, name, email, role, approved")
     .eq("id", user.id)
     .single<Profile>();
 

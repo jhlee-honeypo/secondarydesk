@@ -31,11 +31,6 @@ function num(fd: FormData, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function intNum(fd: FormData, key: string): number | null {
-  const n = num(fd, key);
-  return n === null ? null : Math.trunc(n);
-}
-
 function isStage(v: string | null): v is DealStage {
   return v !== null && (DEAL_STAGES as string[]).includes(v);
 }
@@ -296,7 +291,128 @@ export async function updateDealStage(
   return { ok: true };
 }
 
+// ---- 딜 수정 폼: 투자사 편집 데이터 로드 -----------------------------------
+// 칸반 카드에는 투자사가 {id, name} 만 실려오므로, 수정 다이얼로그를 열 때
+// 유형·일자·메모·대표 컨택·조합을 별도 조회한다.
+
+export type InvestorEditData = {
+  investor: {
+    name: string;
+    type: string | null;
+    met_date: string | null;
+    description: string | null;
+  };
+  contact: { id: string; name: string; title: string | null } | null;
+  funds: {
+    id: string;
+    name: string;
+    main_purpose: string | null;
+    notes: string | null;
+  }[];
+};
+
+export async function getInvestorEditData(
+  investorId: string,
+): Promise<{ ok: true; data: InvestorEditData } | { ok: false; error: string }> {
+  if (!investorId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const supabase = await createClient();
+  const [{ data: inv, error: invErr }, { data: contacts }, { data: funds }] =
+    await Promise.all([
+      supabase
+        .from("investors")
+        .select("name, type, met_date, description")
+        .eq("id", investorId)
+        .single(),
+      supabase
+        .from("contacts")
+        .select("id, name, title")
+        .eq("investor_id", investorId)
+        .order("created_at", { ascending: true })
+        .limit(1),
+      supabase
+        .from("funds")
+        .select("id, name, main_purpose, notes")
+        .eq("investor_id", investorId)
+        .order("created_at", { ascending: true }),
+    ]);
+
+  if (invErr || !inv) {
+    return { ok: false, error: invErr?.message ?? "투자사를 찾을 수 없습니다." };
+  }
+
+  return {
+    ok: true,
+    data: {
+      investor: inv as InvestorEditData["investor"],
+      contact: (contacts?.[0] as InvestorEditData["contact"]) ?? null,
+      funds: (funds ?? []) as InvestorEditData["funds"],
+    },
+  };
+}
+
+// 수정 폼에서 함께 제출된 조합 행(name="fund_row_id"·"fund_name"·…)을
+// 기존 조합과 동기화한다: 기존 행은 수정, 신규 행은 추가, 사라진 행은 삭제
+// (단, 딜이 참조 중인 조합은 보존).
+async function syncInvestorFunds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  investorId: string,
+  fd: FormData,
+): Promise<void> {
+  const ids = fd.getAll("fund_row_id");
+  const names = fd.getAll("fund_name");
+  const purposes = fd.getAll("fund_main_purpose");
+  const notes = fd.getAll("fund_notes");
+
+  const submittedIds = new Set<string>();
+  for (let i = 0; i < names.length; i++) {
+    const fid = entryText(ids[i]);
+    const name = entryText(names[i]);
+    const mainPurpose = entryText(purposes[i]);
+    const note = entryText(notes[i]);
+
+    if (fid) {
+      submittedIds.add(fid);
+      // 기존 조합 수정 (이름은 비어있지 않을 때만 갱신)
+      const upd: { main_purpose: string | null; notes: string | null; name?: string } =
+        { main_purpose: mainPurpose, notes: note };
+      if (name) upd.name = name;
+      await supabase.from("funds").update(upd).eq("id", fid);
+    } else if (name) {
+      // 신규 조합
+      await supabase.from("funds").insert({
+        investor_id: investorId,
+        name,
+        main_purpose: mainPurpose,
+        notes: note,
+      });
+    }
+  }
+
+  // 제출되지 않은(=화면에서 제거된) 기존 조합 삭제. 단, 딜이 참조 중이면 보존.
+  const { data: existing } = await supabase
+    .from("funds")
+    .select("id")
+    .eq("investor_id", investorId);
+  const toRemove = (existing ?? [])
+    .map((f) => f.id as string)
+    .filter((fid) => !submittedIds.has(fid));
+  if (toRemove.length > 0) {
+    const { data: refs } = await supabase
+      .from("deals")
+      .select("fund_id")
+      .in("fund_id", toRemove);
+    const referenced = new Set((refs ?? []).map((r) => r.fund_id as string));
+    const deletable = toRemove.filter((fid) => !referenced.has(fid));
+    if (deletable.length > 0) {
+      await supabase.from("funds").delete().in("id", deletable);
+    }
+  }
+}
+
 // ---- 딜 수정 ---------------------------------------------------------------
+// 딜 단계·대상 조합·담당·드랍 사유와 함께, 연결된 투자사 정보(투자사명·유형·
+// 일자·메모·대표 컨택·조합)도 한 폼에서 편집한다.
 
 export async function updateDeal(
   _prev: ActionResult | undefined,
@@ -305,33 +421,63 @@ export async function updateDeal(
   const id = requiredText(fd, "id");
   if (!id) return { ok: false, error: "잘못된 요청입니다." };
 
+  const supabase = await createClient();
+
+  // 1) 딜 본체(단계·메모). 대상 조합/담당은 수정 폼에서 제거되어 건드리지 않는다.
   const stageInput = text(fd, "stage");
-  const payload = {
-    fund_id: text(fd, "fund_id"),
-    owner_id: text(fd, "owner_id"),
+  const dealPayload = {
     stage: isStage(stageInput) ? stageInput : undefined,
-    intro_source: text(fd, "intro_source"),
-    intro_relationship: text(fd, "intro_relationship"),
-    intro_date: text(fd, "intro_date"),
-    expected_amount: num(fd, "expected_amount"),
-    probability: intNum(fd, "probability"),
-    next_action: text(fd, "next_action"),
-    next_action_date: text(fd, "next_action_date"),
-    target_close_date: text(fd, "target_close_date"),
     lost_reason: text(fd, "lost_reason"),
   };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: dealRow, error: dealErr } = await supabase
     .from("deals")
-    .update(payload)
+    .update(dealPayload)
     .eq("id", id)
     .select("listing_id, investor_id")
     .single();
+  if (dealErr) return { ok: false, error: dealErr.message };
 
-  if (error) return { ok: false, error: error.message };
+  const investorId = (dealRow?.investor_id as string | undefined) ?? null;
 
-  revalidateDeal(data?.listing_id, data?.investor_id);
+  // 2) 투자사 정보
+  if (investorId) {
+    const investorName = text(fd, "investor_name");
+    if (investorName) {
+      const { error: invErr } = await supabase
+        .from("investors")
+        .update({
+          name: investorName,
+          type: text(fd, "investor_type"),
+          met_date: text(fd, "investor_met_date"),
+          description: text(fd, "investor_description"),
+        })
+        .eq("id", investorId);
+      if (invErr) return { ok: false, error: invErr.message };
+    }
+
+    // 3) 대표 컨택 (기존이면 수정, 없으면 이름 있을 때 생성)
+    const contactId = text(fd, "contact_id");
+    const contactName = text(fd, "contact_name");
+    if (contactId) {
+      const contactUpd: { title: string | null; name?: string } = {
+        title: text(fd, "contact_title"),
+      };
+      if (contactName) contactUpd.name = contactName;
+      await supabase.from("contacts").update(contactUpd).eq("id", contactId);
+    } else if (contactName) {
+      await supabase.from("contacts").insert({
+        investor_id: investorId,
+        name: contactName,
+        title: text(fd, "contact_title"),
+      });
+    }
+
+    // 4) 조합 동기화
+    await syncInvestorFunds(supabase, investorId, fd);
+  }
+
+  revalidateDeal(dealRow?.listing_id, investorId);
+  revalidatePath("/investors");
   return { ok: true };
 }
 
@@ -351,4 +497,66 @@ export async function deleteDeal(
 
   revalidateDeal(data?.listing_id, data?.investor_id);
   if (opts?.redirectTo) redirect(opts.redirectTo);
+}
+
+// ---- 단계 이력 관리 (딜 수정 폼) -------------------------------------------
+// 잘못된 이동으로 쌓인 이력을 수정 폼에서 행별로 즉시 수정/삭제한다.
+// (폼 저장과 분리 — 저장 시 stage 변경이 트리거로 새 이력을 만드는 것과 충돌 방지)
+
+export type StageEventRow = {
+  id: string;
+  stage: DealStage;
+  changed_at: string;
+};
+
+export async function getDealStageEvents(
+  dealId: string,
+): Promise<{ ok: true; events: StageEventRow[] } | { ok: false; error: string }> {
+  if (!dealId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("deal_stage_events")
+    .select("id, stage, changed_at")
+    .eq("deal_id", dealId)
+    .order("changed_at", { ascending: true });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, events: (data ?? []) as StageEventRow[] };
+}
+
+export async function updateStageEvent(
+  eventId: string,
+  patch: { stage?: DealStage; changed_at?: string },
+): Promise<ActionResult> {
+  if (!eventId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const upd: { stage?: DealStage; changed_at?: string } = {};
+  if (patch.stage && isStage(patch.stage)) upd.stage = patch.stage;
+  if (patch.changed_at) upd.changed_at = patch.changed_at;
+  if (Object.keys(upd).length === 0) return { ok: true };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("deal_stage_events")
+    .update(upd)
+    .eq("id", eventId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/deals");
+  return { ok: true };
+}
+
+export async function deleteStageEvent(eventId: string): Promise<ActionResult> {
+  if (!eventId) return { ok: false, error: "잘못된 요청입니다." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("deal_stage_events")
+    .delete()
+    .eq("id", eventId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/deals");
+  return { ok: true };
 }

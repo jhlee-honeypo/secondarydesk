@@ -116,7 +116,7 @@ export async function importListings(
     if (!g) {
       const rawStatus = clean(r.status);
       const status =
-        rawStatus && STATUS_SET.has(rawStatus) ? rawStatus : "세일즈중";
+        rawStatus && STATUS_SET.has(rawStatus) ? rawStatus : "LIVE";
       g = {
         name,
         payload: {

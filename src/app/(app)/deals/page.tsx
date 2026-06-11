@@ -15,17 +15,24 @@ export default async function DealsPage() {
     { data: investorRows },
     { data: fundRows },
     { data: userRows },
+    { data: holdingFundRows },
+    { data: listingFundRows },
   ] = await Promise.all([
     supabase
       .from("deals")
       .select(
-        "*, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email)",
+        "*, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at)",
       )
       .order("created_at", { ascending: false }),
     supabase.from("listings").select("id, company_name").order("company_name"),
     supabase.from("investors").select("id, name").order("name"),
     supabase.from("funds").select("id, name, investor_id").order("name"),
-    supabase.from("users").select("id, name, email, role").order("name"),
+    supabase
+      .from("users")
+      .select("id, name, email, first_name, last_name, role")
+      .order("name"),
+    supabase.from("holding_funds").select("id, name").order("name"),
+    supabase.from("listing_funds").select("listing_id, holding_fund_id"),
   ]);
 
   const deals = (dealRows ?? []) as DealCard[];
@@ -37,6 +44,16 @@ export default async function DealsPage() {
     investor_id: string;
   }[];
   const users = (userRows ?? []) as UserRow[];
+  const holdingFunds = (holdingFundRows ?? []) as { id: string; name: string }[];
+
+  // 매물 → 소속 운용펀드 id 목록 매핑(딜 보드 필터·딜 생성 매물 그룹핑용)
+  const listingFundMap: Record<string, string[]> = {};
+  for (const lf of (listingFundRows ?? []) as {
+    listing_id: string;
+    holding_fund_id: string;
+  }[]) {
+    (listingFundMap[lf.listing_id] ??= []).push(lf.holding_fund_id);
+  }
 
   return (
     <div className="space-y-6">
@@ -54,6 +71,8 @@ export default async function DealsPage() {
         funds={funds}
         users={users}
         currentUserId={me?.id ?? ""}
+        holdingFunds={holdingFunds}
+        listingFundMap={listingFundMap}
       />
     </div>
   );

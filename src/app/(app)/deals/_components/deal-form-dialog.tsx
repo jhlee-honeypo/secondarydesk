@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Plus, X } from "lucide-react";
 
 import {
   Dialog,
@@ -23,34 +24,56 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DEAL_STAGES, type Deal, type UserRow } from "@/lib/types";
+import {
+  DEAL_STAGES,
+  INVESTOR_TYPES,
+  type Deal,
+  type UserRow,
+} from "@/lib/types";
 import { Field } from "@/components/app/field";
-import { MoneyInput } from "@/components/app/money-input";
 import { InvestorPicker } from "@/components/app/investor-picker";
-import { createDeal, updateDeal, type ActionResult } from "../actions";
+import { StageHistoryEditor } from "./stage-history-editor";
+import {
+  createDeal,
+  getInvestorEditData,
+  updateDeal,
+  type ActionResult,
+  type InvestorEditData,
+} from "../actions";
 
 export type DealOptionListing = { id: string; company_name: string };
 export type DealOptionInvestor = { id: string; name: string };
 export type DealOptionFund = { id: string; name: string; investor_id: string };
 
+const FUND_ALL = "all";
+
 /**
- * 매물 복수 선택(생성 시) — 검색 + 체크박스 목록. 선택값은 hidden input
- * (name="listing_ids")으로 폼에 실려 서버 액션이 매물마다 딜을 생성한다.
+ * 매물 복수 선택(생성 시) — 운용펀드로 먼저 구분 + 검색 + 체크박스 목록.
+ * 선택값은 hidden input(name="listing_ids")으로 폼에 실려 서버 액션이
+ * 매물마다 딜을 생성한다.
  */
 function ListingMultiSelect({
   listings,
   value,
   onChange,
+  holdingFunds = [],
+  listingFundMap = {},
 }: {
   listings: DealOptionListing[];
   value: string[];
   onChange: (next: string[]) => void;
+  holdingFunds?: { id: string; name: string }[];
+  listingFundMap?: Record<string, string[]>;
 }) {
   const [q, setQ] = useState("");
+  const [fund, setFund] = useState(FUND_ALL);
   const query = q.trim().toLowerCase();
-  const filtered = query
-    ? listings.filter((l) => l.company_name.toLowerCase().includes(query))
-    : listings;
+  const filtered = listings.filter((l) => {
+    const byFund =
+      fund === FUND_ALL || (listingFundMap[l.id] ?? []).includes(fund);
+    const byText = !query || l.company_name.toLowerCase().includes(query);
+    return byFund && byText;
+  });
 
   function toggle(id: string) {
     onChange(
@@ -63,6 +86,21 @@ function ListingMultiSelect({
       {value.map((id) => (
         <input key={id} type="hidden" name="listing_ids" value={id} />
       ))}
+      {holdingFunds.length > 0 && (
+        <Select value={fund} onValueChange={setFund}>
+          <SelectTrigger aria-label="운용펀드로 구분">
+            <SelectValue placeholder="운용펀드" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={FUND_ALL}>전체 운용펀드</SelectItem>
+            {holdingFunds.map((f) => (
+              <SelectItem key={f.id} value={f.id}>
+                {f.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <Input
         placeholder="매물 검색…"
         value={q}
@@ -71,7 +109,9 @@ function ListingMultiSelect({
       <div className="max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-input">
         {filtered.length === 0 ? (
           <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-            {listings.length === 0 ? "등록된 매물이 없습니다." : "검색 결과 없음"}
+            {listings.length === 0
+              ? "등록된 매물이 없습니다."
+              : "조건에 맞는 매물이 없습니다."}
           </p>
         ) : (
           filtered.map((l) => (
@@ -95,18 +135,191 @@ function ListingMultiSelect({
   );
 }
 
+/**
+ * 딜 수정 폼에서 연결된 투자사 정보를 함께 편집하는 섹션.
+ * 새 딜 생성의 InvestorPicker(새 투자사 등록)와 동일한 항목을 기존값으로
+ * 채워 편집한다. 제출 필드명도 동일 계열을 쓰되, 조합 행의 식별자는 딜의
+ * "대상 조합"(name="fund_id")과 충돌하지 않도록 name="fund_row_id"를 사용한다.
+ *
+ * 제출 필드: investor_name·investor_type·investor_met_date·
+ *   investor_description·contact_id·contact_name·contact_title·
+ *   fund_row_id[]·fund_name[]·fund_main_purpose[]·fund_notes[]
+ */
+function InvestorEditSection({ data }: { data: InvestorEditData }) {
+  type FundRow = {
+    key: number;
+    id: string;
+    name: string;
+    main_purpose: string | null;
+    notes: string | null;
+  };
+
+  const [fundRows, setFundRows] = useState<FundRow[]>(() =>
+    data.funds.length > 0
+      ? data.funds.map((f, i) => ({ key: i, ...f }))
+      : [{ key: 0, id: "", name: "", main_purpose: null, notes: null }],
+  );
+
+  // 유형: 제어형 Select + hidden input. (Radix Select 의 숨은 폼 컨트롤은
+  // 드롭다운이 닫히면 값이 유실될 수 있어, 명시적 hidden input 으로 제출한다.)
+  const [investorType, setInvestorType] = useState(data.investor.type ?? "");
+
+  function addFundRow() {
+    setFundRows((rows) => [
+      ...rows,
+      {
+        key: (rows[rows.length - 1]?.key ?? 0) + 1,
+        id: "",
+        name: "",
+        main_purpose: null,
+        notes: null,
+      },
+    ]);
+  }
+  function removeFundRow(key: number) {
+    setFundRows((rows) => rows.filter((r) => r.key !== key));
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="투자사" required>
+        <Input
+          name="investor_name"
+          defaultValue={data.investor.name}
+          placeholder="투자사명"
+          required
+        />
+      </Field>
+
+      <div className="space-y-4 rounded-lg border border-border p-3">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="유형">
+            <input type="hidden" name="investor_type" value={investorType} />
+            <Select
+              value={investorType || undefined}
+              onValueChange={setInvestorType}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="선택 (선택사항)" />
+              </SelectTrigger>
+              <SelectContent>
+                {INVESTOR_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="일자" htmlFor="investor_met_date">
+            <Input
+              id="investor_met_date"
+              name="investor_met_date"
+              type="date"
+              defaultValue={data.investor.met_date ?? ""}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="컨택 심사역" htmlFor="contact_name">
+            <Input
+              id="contact_name"
+              name="contact_name"
+              placeholder="이름"
+              defaultValue={data.contact?.name ?? ""}
+            />
+          </Field>
+          <Field label="직책" htmlFor="contact_title">
+            <Input
+              id="contact_title"
+              name="contact_title"
+              placeholder="상무 / 심사역 등"
+              defaultValue={data.contact?.title ?? ""}
+            />
+          </Field>
+        </div>
+        {data.contact && (
+          <input type="hidden" name="contact_id" value={data.contact.id} />
+        )}
+
+        <Field label="개요·성향 메모" htmlFor="investor_description">
+          <Textarea
+            id="investor_description"
+            name="investor_description"
+            defaultValue={data.investor.description ?? ""}
+          />
+        </Field>
+
+        <div className="space-y-3 rounded-md bg-muted/40 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">조합</p>
+            <Button type="button" variant="outline" size="xs" onClick={addFundRow}>
+              <Plus />
+              조합 추가
+            </Button>
+          </div>
+          {fundRows.map((row, idx) => (
+            <div
+              key={row.key}
+              className="space-y-2 rounded-md border border-border bg-background p-2.5"
+            >
+              <input type="hidden" name="fund_row_id" value={row.id} />
+              <div className="flex items-center gap-2">
+                <Input
+                  name="fund_name"
+                  defaultValue={row.name}
+                  placeholder={`조합명${idx === 0 ? "" : ` ${idx + 1}`}`}
+                  aria-label="조합명"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="조합 행 삭제"
+                  onClick={() => removeFundRow(row.key)}
+                >
+                  <X />
+                </Button>
+              </div>
+              <Input
+                name="fund_main_purpose"
+                defaultValue={row.main_purpose ?? ""}
+                placeholder="주목적"
+              />
+              <Input
+                name="fund_notes"
+                defaultValue={row.notes ?? ""}
+                placeholder="비고"
+              />
+            </div>
+          ))}
+          {fundRows.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              등록된 조합이 없습니다. &lsquo;조합 추가&rsquo;로 등록하세요.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DealFormDialog({
   trigger,
   deal,
   listings,
   investors,
-  funds,
-  users,
-  currentUserId,
   lockListingId,
   lockInvestorId,
+  holdingFunds,
+  listingFundMap,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
 }: {
-  trigger: React.ReactNode;
+  /** 트리거 버튼. 외부에서 open/onOpenChange 로 직접 제어할 때는 생략 가능. */
+  trigger?: React.ReactNode;
   deal?: Deal;
   listings: DealOptionListing[];
   investors: DealOptionInvestor[];
@@ -115,17 +328,53 @@ export function DealFormDialog({
   currentUserId: string;
   lockListingId?: string;
   lockInvestorId?: string;
+  /** 운용펀드 목록 + 매물→운용펀드 매핑(생성 시 매물 복수선택 그룹핑용, 선택). */
+  holdingFunds?: { id: string; name: string }[];
+  listingFundMap?: Record<string, string[]>;
+  /** 제어형(controlled) 사용: 부모가 열림 상태를 보유. (칸반 카드 클릭 등) */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const isEdit = Boolean(deal);
   const [state, formAction, pending] = useActionState<
     ActionResult | undefined,
     FormData
   >(isEdit ? updateDeal : createDeal, undefined);
-  const [open, setOpen] = useState(false);
 
-  // 조합(fund) cascade 를 위한 선택 투자사. 수정 모드는 딜의 투자사로 고정.
+  // 비제어(자체 trigger) / 제어(부모가 open 보유) 양쪽 지원
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isControlled) controlledOnOpenChange?.(next);
+    else setInternalOpen(next);
+  };
+
+  // 수정 모드의 투자사 = 딜의 투자사로 고정(투자사 편집 데이터 지연 로드 키).
   const fixedInvestorId = deal?.investor_id ?? lockInvestorId;
-  const [investorId] = useState(fixedInvestorId ?? "");
+
+  // 단계: 제어형 Select + hidden input (Radix Select 의 숨은 폼 컨트롤이
+  // 드롭다운을 닫으면 값을 유실할 수 있어 명시적 hidden input 으로 제출).
+  const [stage, setStage] = useState<string>(deal?.stage ?? "컨택");
+
+  // 수정 모드: 연결된 투자사의 편집 데이터(유형·일자·메모·컨택·조합)를
+  // 다이얼로그를 열 때 지연 로드한다(칸반 카드엔 투자사 id·name 만 실려옴).
+  const [investorData, setInvestorData] = useState<InvestorEditData | null>(null);
+  const [investorLoading, setInvestorLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || !isEdit || !fixedInvestorId) return;
+    let cancelled = false;
+    setInvestorLoading(true);
+    getInvestorEditData(fixedInvestorId).then((res) => {
+      if (cancelled) return;
+      if (res.ok) setInvestorData(res.data);
+      setInvestorLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isEdit, fixedInvestorId]);
 
   // 생성 시 매물 복수 선택(매물 잠금/수정 모드가 아닐 때만 사용)
   const multiListing = !isEdit && !lockListingId;
@@ -144,13 +393,14 @@ export function DealFormDialog({
     }
   }, [state]);
 
-  // 닫힐 때 입력 상태 초기화(다음 생성에 잔존 방지)
+  // 닫힐 때 입력 상태 초기화(다음 생성/수정에 잔존 방지)
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) setSelectedListingIds([]);
+    if (!next) {
+      setSelectedListingIds([]);
+      setInvestorData(null);
+    }
   }
-
-  const investorFunds = funds.filter((f) => f.investor_id === investorId);
 
   const lockedListing = listings.find((l) => l.id === (deal?.listing_id ?? lockListingId));
   const lockedInvestor = investors.find((i) => i.id === fixedInvestorId);
@@ -166,6 +416,8 @@ export function DealFormDialog({
         listings={listings}
         value={selectedListingIds}
         onChange={setSelectedListingIds}
+        holdingFunds={holdingFunds}
+        listingFundMap={listingFundMap}
       />
     </Field>
   ) : (
@@ -182,9 +434,22 @@ export function DealFormDialog({
   );
 
   // 투자사 필드:
-  //  - 수정/잠금: 고정 표시
+  //  - 수정: 연결된 투자사 정보를 직접 편집(지연 로드한 데이터로 프리필)
+  //  - 잠금(매물/투자사 상세에서 생성): 고정 표시
   //  - 생성: 기존 투자사 선택 ↔ 새 투자사 등록 토글(InvestorPicker 공용)
-  const investorField = !investorSelectable ? (
+  const investorField = isEdit ? (
+    investorData ? (
+      <InvestorEditSection data={investorData} />
+    ) : (
+      <Field label="투자사" required>
+        <div className="flex h-9 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+          {investorLoading
+            ? "투자사 정보를 불러오는 중…"
+            : (lockedInvestor?.name ?? deal?.investor_id ?? "—")}
+        </div>
+      </Field>
+    )
+  ) : !investorSelectable ? (
     <Field label="투자사" required>
       <input type="hidden" name="investor_id" value={fixedInvestorId} />
       <div className="flex h-9 items-center rounded-lg border border-input bg-muted/40 px-3 text-sm">
@@ -197,13 +462,13 @@ export function DealFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? "딜 수정" : "새 딜 생성"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "딜 단계·담당자·다음 액션 등을 수정합니다."
+              ? "딜 단계와 함께 연결된 투자사 정보(유형·일자·컨택·조합)를 수정합니다."
               : "투자사(신규 등록 또는 기존 선택)와 소개할 매물을 골라 딜을 만듭니다. 매물을 여러 개 선택하면 매물마다 딜이 생성됩니다."}
           </DialogDescription>
         </DialogHeader>
@@ -219,8 +484,9 @@ export function DealFormDialog({
           </div>
 
           {/* 단계 — 생성·수정 공통 */}
-          <Field label="단계">
-            <Select name="stage" defaultValue={deal?.stage ?? "컨택"}>
+          <Field label="단계" required>
+            <input type="hidden" name="stage" value={stage} />
+            <Select value={stage} onValueChange={setStage}>
               <SelectTrigger>
                 <SelectValue placeholder="선택" />
               </SelectTrigger>
@@ -236,151 +502,15 @@ export function DealFormDialog({
 
           {!isEdit && (
             <p className="text-xs text-muted-foreground">
-              담당 심사역은 딜 생성자(나)로 지정됩니다. 조합·예상 규모·소개 경로·다음
-              액션 등 상세는 생성 후 딜 수정에서 입력할 수 있습니다.
+              담당 심사역은 딜 생성자(나)로 지정됩니다. 투자사 상세 정보는 생성 후
+              딜 수정에서 입력할 수 있습니다.
             </p>
           )}
 
-          {/* 상세 입력은 수정 모드에서만 노출 */}
-          {isEdit && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="대상 조합">
-                  <Select
-                    name="fund_id"
-                    defaultValue={deal?.fund_id ?? undefined}
-                    disabled={!investorId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue
-                        placeholder={
-                          investorId
-                            ? investorFunds.length
-                              ? "선택"
-                              : "등록된 조합 없음"
-                            : "투자사 먼저 선택"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {investorFunds.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="담당 심사역">
-                  <Select
-                    name="owner_id"
-                    defaultValue={deal?.owner_id ?? currentUserId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.name ?? u.email ?? u.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-
-              <Field label="예상 거래 규모 (KRW)" htmlFor="expected_amount">
-                <MoneyInput
-                  id="expected_amount"
-                  name="expected_amount"
-                  placeholder="10,000,000,000"
-                  defaultValue={deal?.expected_amount}
-                />
-              </Field>
-
-              {/* 소개 경로(F8) — 네트워크 추적: 소개자·관계·일자 */}
-              <div className="space-y-3 rounded-lg border border-border p-3">
-                <p className="text-sm font-medium">소개 경로</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="소개자" htmlFor="intro_source">
-                    <Input
-                      id="intro_source"
-                      name="intro_source"
-                      placeholder="예: 김OO 대표"
-                      defaultValue={deal?.intro_source ?? ""}
-                    />
-                  </Field>
-                  <Field label="관계" htmlFor="intro_relationship">
-                    <Input
-                      id="intro_relationship"
-                      name="intro_relationship"
-                      placeholder="예: 포트폴리오사 대표"
-                      defaultValue={deal?.intro_relationship ?? ""}
-                    />
-                  </Field>
-                </div>
-                <Field label="소개 일자" htmlFor="intro_date">
-                  <Input
-                    id="intro_date"
-                    name="intro_date"
-                    type="date"
-                    defaultValue={deal?.intro_date ?? ""}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="다음 액션" htmlFor="next_action">
-                  <Input
-                    id="next_action"
-                    name="next_action"
-                    placeholder="예: 티저 발송"
-                    defaultValue={deal?.next_action ?? ""}
-                  />
-                </Field>
-                <Field label="다음 액션 예정일" htmlFor="next_action_date">
-                  <Input
-                    id="next_action_date"
-                    name="next_action_date"
-                    type="date"
-                    defaultValue={deal?.next_action_date ?? ""}
-                  />
-                </Field>
-              </div>
-            </>
-          )}
-
-          {/* 수정 모드 전용 필드 */}
-          {isEdit && (
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="성사 확률 (%)" htmlFor="probability">
-                <Input
-                  id="probability"
-                  name="probability"
-                  inputMode="numeric"
-                  placeholder="0–100"
-                  defaultValue={deal?.probability ?? ""}
-                />
-              </Field>
-              <Field label="목표 클로징일" htmlFor="target_close_date">
-                <Input
-                  id="target_close_date"
-                  name="target_close_date"
-                  type="date"
-                  defaultValue={deal?.target_close_date ?? ""}
-                />
-              </Field>
-            </div>
-          )}
+          {isEdit && <StageHistoryEditor dealId={deal!.id} />}
 
           {isEdit && (
-            <Field
-              label="드랍 사유"
-              htmlFor="lost_reason"
-              hint="Lost 단계로 옮긴 경우 사유 기록"
-            >
+            <Field label="메모" htmlFor="lost_reason">
               <Textarea
                 id="lost_reason"
                 name="lost_reason"
@@ -410,7 +540,9 @@ export function DealFormDialog({
             <Button
               type="submit"
               disabled={
-                pending || (multiListing && selectedListingIds.length === 0)
+                pending ||
+                (multiListing && selectedListingIds.length === 0) ||
+                (isEdit && investorLoading)
               }
             >
               {pending

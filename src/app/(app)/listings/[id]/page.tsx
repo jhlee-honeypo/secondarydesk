@@ -13,7 +13,8 @@ import {
   type ListingWithFunds,
   type UserRow,
 } from "@/lib/types";
-import { formatDate, formatKRW } from "@/lib/format";
+import { formatDate, formatKRW, formatWon } from "@/lib/format";
+import { computeTotals } from "@/lib/exit-scenario";
 import { rankFundsForListing, type FundWithInvestor } from "@/lib/match";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export default async function ListingDetailPage({
     { data: investorRows },
     { data: investorFundRows },
     { data: userRows },
+    { data: roundRows },
   ] = await Promise.all([
     supabase
       .from("listings")
@@ -66,6 +68,11 @@ export default async function ListingDetailPage({
       .select("*, investor:investors(id, name)")
       .order("name"),
     supabase.from("users").select("id, name, email, role").order("name"),
+    supabase
+      .from("exit_scenario_rounds")
+      .select("round_no, label, amount, unit_price, shares")
+      .eq("listing_id", id)
+      .order("round_no", { ascending: true }),
   ]);
 
   if (!listingRow) notFound();
@@ -79,6 +86,22 @@ export default async function ListingDetailPage({
 
   const deals = (dealRows ?? []) as DealCard[];
   const allFunds = (investorFundRows ?? []) as FundWithInvestor[];
+
+  // 투자 데이터(EXIT 시나리오 라운드) — 개요에 합계·라운드 표로 표시
+  const rounds = (roundRows ?? []) as {
+    round_no: number;
+    label: string | null;
+    amount: number;
+    unit_price: number;
+    shares: number;
+  }[];
+  const roundTotals = computeTotals(
+    rounds.map((r) => ({
+      amount: r.amount || 0,
+      unitPrice: r.unit_price || 0,
+      shares: r.shares || 0,
+    })),
+  );
 
   // 이 매물로 잠긴 딜 다이얼로그 옵션(투자사는 선택 가능 → 전체 목록·전체 조합 전달)
   const dealDialogProps = {
@@ -122,9 +145,6 @@ export default async function ListingDetailPage({
               {LISTING_STATUS_LABEL[listing.status]}
             </Badge>
           </div>
-          {listing.summary && (
-            <p className="text-sm text-muted-foreground">{listing.summary}</p>
-          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -183,12 +203,6 @@ export default async function ListingDetailPage({
                   <dd className="text-foreground">{listing.stage ?? "—"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-muted-foreground">최신 라운드 밸류</dt>
-                  <dd className="text-foreground">
-                    {formatKRW(listing.asking_valuation)}
-                  </dd>
-                </div>
-                <div>
                   <dt className="text-xs text-muted-foreground">등록일</dt>
                   <dd className="text-foreground">
                     {formatDate(listing.created_at)}
@@ -212,6 +226,86 @@ export default async function ListingDetailPage({
                   </dd>
                 </div>
               </dl>
+
+              {/* 투자 데이터(EXIT 시나리오 소스) */}
+              <div className="border-t border-border pt-4">
+                <p className="mb-3 text-sm font-medium">투자 데이터</p>
+                {rounds.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    입력된 투자 데이터가 없습니다. “매물 수정”에서 라운드별
+                    단가·주식수를 입력하세요.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          총 투자원금
+                        </dt>
+                        <dd className="text-foreground">
+                          {formatWon(roundTotals.totalPrincipal)}원
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          총 보유 주식수
+                        </dt>
+                        <dd className="text-foreground">
+                          {roundTotals.totalShares.toLocaleString("ko-KR")}주
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">
+                          가중평균 취득단가
+                        </dt>
+                        <dd className="text-foreground">
+                          {formatWon(roundTotals.avgUnitPrice)}원/주
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="overflow-hidden rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                            <th className="px-3 py-2 font-medium">라운드</th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              투자 단가 (원/주)
+                            </th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              보유 주식수
+                            </th>
+                            <th className="px-3 py-2 text-right font-medium">
+                              투자액 (원)
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rounds.map((r, i) => (
+                            <tr
+                              key={r.round_no}
+                              className="border-b border-border last:border-0"
+                            >
+                              <td className="px-3 py-2">
+                                {r.label || `${i + 1}차`}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums">
+                                {formatWon(r.unit_price)}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums">
+                                {r.shares.toLocaleString("ko-KR")}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums">
+                                {formatWon(r.amount)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

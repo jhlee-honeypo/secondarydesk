@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -12,7 +12,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Bookmark, CalendarPlus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Bookmark, CalendarPlus, Plus, Trash2, X } from "lucide-react";
 
 import {
   DEAL_STAGES,
@@ -21,7 +21,7 @@ import {
   type DealStage,
   type UserRow,
 } from "@/lib/types";
-import { formatDate, formatKRW } from "@/lib/format";
+import { formatDate, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ import { deleteDeal, updateDealStage } from "../actions";
 const ALL = "all";
 const VIEWS_KEY = "secondarydesk:deal-views";
 
-type SavedView = { name: string; listing: string; owner: string };
+type SavedView = { name: string; listing: string; owner: string; fund?: string };
 
 export function DealBoard({
   initialDeals,
@@ -55,6 +55,8 @@ export function DealBoard({
   funds,
   users,
   currentUserId,
+  holdingFunds,
+  listingFundMap,
 }: {
   initialDeals: DealCard[];
   listings: DealOptionListing[];
@@ -62,6 +64,8 @@ export function DealBoard({
   funds: DealOptionFund[];
   users: UserRow[];
   currentUserId: string;
+  holdingFunds: { id: string; name: string }[];
+  listingFundMap: Record<string, string[]>;
 }) {
   const [deals, setDeals] = useState(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -70,6 +74,7 @@ export function DealBoard({
   // 필터 상태(클라이언트 측, 즉시 반영)
   const [listingFilter, setListingFilter] = useState(ALL);
   const [ownerFilter, setOwnerFilter] = useState(ALL);
+  const [fundFilter, setFundFilter] = useState(ALL);
 
   // 저장된 뷰(F9) — localStorage 영속
   const [views, setViews] = useState<SavedView[]>([]);
@@ -103,12 +108,13 @@ export function DealBoard({
     if (!name) return;
     persistViews([
       ...views.filter((v) => v.name !== name),
-      { name, listing: listingFilter, owner: ownerFilter },
+      { name, listing: listingFilter, owner: ownerFilter, fund: fundFilter },
     ]);
     setViewName("");
   }
 
-  const filterActive = listingFilter !== ALL || ownerFilter !== ALL;
+  const filterActive =
+    listingFilter !== ALL || ownerFilter !== ALL || fundFilter !== ALL;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -118,6 +124,8 @@ export function DealBoard({
 
   const visible = deals.filter(
     (d) =>
+      (fundFilter === ALL ||
+        (listingFundMap[d.listing_id] ?? []).includes(fundFilter)) &&
       (listingFilter === ALL || d.listing_id === listingFilter) &&
       (ownerFilter === ALL || d.owner_id === ownerFilter),
   );
@@ -160,6 +168,8 @@ export function DealBoard({
     funds,
     users,
     currentUserId,
+    holdingFunds,
+    listingFundMap,
   };
 
   return (
@@ -167,6 +177,20 @@ export function DealBoard({
       {/* 필터 행 + 딜 생성 */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          <Select value={fundFilter} onValueChange={setFundFilter}>
+            <SelectTrigger className="w-44" aria-label="운용펀드 필터">
+              <SelectValue placeholder="운용펀드" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>전체 운용펀드</SelectItem>
+              {holdingFunds.map((f) => (
+                <SelectItem key={f.id} value={f.id}>
+                  {f.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={listingFilter} onValueChange={setListingFilter}>
             <SelectTrigger className="w-48" aria-label="매물 필터">
               <SelectValue placeholder="매물" />
@@ -236,6 +260,7 @@ export function DealBoard({
               onClick={() => {
                 setListingFilter(v.listing);
                 setOwnerFilter(v.owner);
+                setFundFilter(v.fund ?? ALL);
               }}
             >
               {v.name}
@@ -374,15 +399,47 @@ function DraggableCard({
     id: deal.id,
   });
 
+  // 카드 클릭 → 딜 수정(제어형 다이얼로그). 드래그와 구분하기 위해
+  // pointerdown 좌표를 기록하고, 클릭 시 이동량이 작을 때만 수정을 연다.
+  const [editOpen, setEditOpen] = useState(false);
+  const downPos = useRef<{ x: number; y: number } | null>(null);
+
   return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      className={cn("touch-none", isDragging && "opacity-40")}
-    >
-      <DealCardView deal={deal} todayStr={todayStr} dialogOptions={dialogOptions} />
-    </div>
+    <>
+      <div
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        onPointerDown={(e) => {
+          downPos.current = { x: e.clientX, y: e.clientY };
+          listeners?.onPointerDown?.(e);
+        }}
+        onClick={(e) => {
+          const start = downPos.current;
+          // 6px 넘게 움직였으면 드래그로 보고 수정 열지 않음
+          if (
+            start &&
+            (Math.abs(e.clientX - start.x) > 5 ||
+              Math.abs(e.clientY - start.y) > 5)
+          ) {
+            return;
+          }
+          setEditOpen(true);
+        }}
+        className={cn(
+          "cursor-pointer touch-none",
+          isDragging && "opacity-40",
+        )}
+      >
+        <DealCardView deal={deal} todayStr={todayStr} dialogOptions={dialogOptions} />
+      </div>
+      <DealFormDialog
+        {...dialogOptions}
+        deal={deal}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
+    </>
   );
 }
 
@@ -409,6 +466,11 @@ function DealCardView({
     deal.stage !== "클로징" &&
     deal.stage !== "드랍";
 
+  // 단계 진입 이력(오래된 순). 마지막 항목 = 현재 단계.
+  const stageHistory = [...(deal.stage_events ?? [])].sort((a, b) =>
+    a.changed_at < b.changed_at ? -1 : a.changed_at > b.changed_at ? 1 : 0,
+  );
+
   return (
     <div
       className={cn(
@@ -424,16 +486,8 @@ function DealCardView({
           <div
             className="flex shrink-0 items-center gap-0.5"
             onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
-            <DealFormDialog
-              {...dialogOptions}
-              deal={deal}
-              trigger={
-                <Button variant="ghost" size="icon-xs" aria-label="딜 수정">
-                  <Pencil />
-                </Button>
-              }
-            />
             <DeleteDialog
               trigger={
                 <Button variant="ghost" size="icon-xs" aria-label="딜 삭제">
@@ -449,10 +503,12 @@ function DealCardView({
       </div>
       <p className="mt-0.5 text-muted-foreground">{deal.investor?.name ?? "—"}</p>
 
-      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{deal.owner?.name ?? deal.owner?.email ?? "—"}</span>
-        <span className="font-medium text-foreground">
-          {formatKRW(deal.expected_amount)}
+      <div className="mt-2 flex items-center justify-end text-xs text-muted-foreground">
+        <span>
+          {deal.owner?.first_name ??
+            deal.owner?.name ??
+            deal.owner?.email ??
+            "—"}
         </span>
       </div>
 
@@ -473,6 +529,42 @@ function DealCardView({
             {deal.next_action}
             {deal.next_action_date && ` · ${formatDate(deal.next_action_date)}`}
           </span>
+        </div>
+      )}
+
+      {/* 단계 이력 미니 타임라인 — 단계가 바뀔 때마다 진입일 누적 */}
+      {stageHistory.length > 0 && (
+        <div className="mt-2 space-y-1 border-t border-border pt-2">
+          {stageHistory.map((ev, i) => {
+            const isCurrent = i === stageHistory.length - 1;
+            return (
+              <div
+                key={`${ev.stage}-${ev.changed_at}-${i}`}
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <span
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    isCurrent ? "bg-primary" : "bg-transparent",
+                  )}
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "flex-1 truncate",
+                    isCurrent
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {ev.stage}
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {formatShortDate(ev.changed_at)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

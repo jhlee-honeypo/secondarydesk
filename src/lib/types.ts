@@ -49,6 +49,8 @@ export type UserRow = {
   id: string;
   name: string | null;
   email: string | null;
+  first_name: string | null;
+  last_name: string | null;
   role: "member" | "lead";
 };
 
@@ -131,26 +133,25 @@ export const SECTOR_OPTIONS = [
   "기타",
 ];
 
-// §4.4 Listing.status
-export type ListingStatus = "준비중" | "세일즈중" | "거래완료" | "보류";
+// §4.4 Listing.status — LIVE(운영 중) / ON SALE(매각 진행·가능) / EXIT(엑싯 완료) / W/O(상각)
+export type ListingStatus = "LIVE" | "ON SALE" | "EXIT" | "W/O";
 
 export const LISTING_STATUSES: ListingStatus[] = [
-  "준비중",
-  "세일즈중",
-  "거래완료",
-  "보류",
+  "LIVE",
+  "ON SALE",
+  "EXIT",
+  "W/O",
 ];
 
-// 폼/필터에서 선택 가능한 상태(준비중 제외). DB enum 값은 LISTING_STATUSES 유지.
-export const SELECTABLE_LISTING_STATUSES: ListingStatus[] =
-  LISTING_STATUSES.filter((s) => s !== "준비중");
+// 폼/필터에서 선택 가능한 상태 — 4개 모두 선택 가능.
+export const SELECTABLE_LISTING_STATUSES: ListingStatus[] = LISTING_STATUSES;
 
-// 화면 표시용 라벨(저장값과 분리 — '세일즈중' enum 은 '세일즈 중'으로 표기).
+// 화면 표시용 라벨(현재는 저장값과 동일한 영문 라벨).
 export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
-  준비중: "준비중",
-  세일즈중: "세일즈 중",
-  거래완료: "거래완료",
-  보류: "보류",
+  LIVE: "LIVE",
+  "ON SALE": "ON SALE",
+  EXIT: "EXIT",
+  "W/O": "W/O",
 };
 
 // §4.5 HoldingFund.status (마이그레이션 20260609000002 로 enum 재정의됨)
@@ -201,10 +202,10 @@ export const LISTING_STATUS_VARIANT: Record<
   ListingStatus,
   "default" | "secondary" | "destructive" | "outline"
 > = {
-  준비중: "outline",
-  세일즈중: "default",
-  거래완료: "secondary",
-  보류: "destructive",
+  LIVE: "outline",
+  "ON SALE": "default",
+  EXIT: "secondary",
+  "W/O": "destructive",
 };
 
 export const HOLDING_FUND_STATUS_VARIANT: Record<
@@ -261,11 +262,34 @@ export type Deal = {
   updated_at: string;
 };
 
-// 칸반 카드/목록용 — 매물·투자사·담당자 이름 조인 임베드
+// 딜 단계 진입 이력 1건 (카드 미니 타임라인용)
+export type DealStageEvent = {
+  stage: DealStage;
+  changed_at: string;
+};
+
+// 칸반 카드/목록용 — 매물·투자사·담당자 이름 + 단계 이력 조인 임베드
 export type DealCard = Deal & {
   listing: { id: string; company_name: string } | null;
   investor: { id: string; name: string } | null;
-  owner: { id: string; name: string | null; email: string | null } | null;
+  owner: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    first_name: string | null;
+  } | null;
+  stage_events: DealStageEvent[];
+};
+
+// EXIT 시나리오용 매물별 투자 라운드
+export type ExitScenarioRound = {
+  id: string;
+  listing_id: string;
+  round_no: number;
+  label: string | null;
+  amount: number;
+  unit_price: number;
+  shares: number;
 };
 
 // §4.8 Activity.type

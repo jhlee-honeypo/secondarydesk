@@ -13,22 +13,29 @@ export default async function AppLayout({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // 승인 전(또는 프로필 없음) 사용자는 앱 데이터 접근 차단 → 승인 대기 화면
+  if (!user.profile?.approved) redirect("/pending");
 
   const name = user.profile?.name ?? user.email ?? "사용자";
+  const isLead = user.profile?.role === "lead";
 
   return (
     <div className="flex min-h-svh flex-1">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-        <div className="flex h-14 items-center gap-2 px-5">
-          <span className="size-5 rounded-md bg-primary" aria-hidden />
-          <span className="text-sm font-semibold tracking-tight">
-            SecondaryDesk
-          </span>
-        </div>
-        <div className="mt-2 flex-1 overflow-y-auto pb-4">
-          <SidebarNav />
-        </div>
-      </aside>
+      {/* 좌측 레일: 평소엔 얇게(아이콘만) 자리만 차지하고, 호버하면 그 위로
+          오버레이되며 펼쳐진다(콘텐츠 리플로우 없음). */}
+      <div className="relative hidden w-16 shrink-0 md:block">
+        <aside className="group absolute inset-y-0 left-0 z-40 flex w-16 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out hover:w-60 hover:shadow-xl">
+          <div className="flex h-14 items-center gap-2 px-5">
+            <span className="size-5 shrink-0 rounded-md bg-primary" aria-hidden />
+            <span className="whitespace-nowrap text-sm font-semibold tracking-tight opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              SecondaryDesk
+            </span>
+          </div>
+          <div className="mt-2 flex-1 overflow-y-auto overflow-x-hidden pb-4">
+            <SidebarNav isLead={isLead} />
+          </div>
+        </aside>
+      </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-border bg-background/80 px-6 backdrop-blur">

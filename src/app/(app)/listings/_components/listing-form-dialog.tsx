@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,8 +31,13 @@ import {
   type Listing,
 } from "@/lib/types";
 import { Field } from "@/components/app/field";
-import { MoneyInput } from "@/components/app/money-input";
-import { createListing, updateListing, type ActionResult } from "../actions";
+import {
+  createListing,
+  getListingRounds,
+  updateListing,
+  type ActionResult,
+} from "../actions";
+import { RoundsEditor, type RoundSeed } from "./rounds-editor";
 
 export function ListingFormDialog({
   trigger,
@@ -53,9 +57,40 @@ export function ListingFormDialog({
   >(isEdit ? updateListing : createListing, undefined);
   const [open, setOpen] = useState(false);
 
+  // 수정 모드: 저장된 투자 라운드를 다이얼로그 열 때 지연 로드(프리필).
+  const [roundsSeed, setRoundsSeed] = useState<RoundSeed[] | null>(
+    isEdit ? null : [],
+  );
+  const [roundsLoading, setRoundsLoading] = useState(false);
+
   useEffect(() => {
     if (state?.ok) setOpen(false);
   }, [state]);
+
+  useEffect(() => {
+    if (!open || !isEdit || !listing) return;
+    let cancelled = false;
+    setRoundsLoading(true);
+    setRoundsSeed(null);
+    getListingRounds(listing.id).then((res) => {
+      if (cancelled) return;
+      setRoundsSeed(
+        res.ok
+          ? res.rounds.map((r) => ({
+              label: r.label,
+              unit_price: r.unit_price,
+              shares: r.shares,
+              amount: r.amount,
+            }))
+          : [],
+      );
+      setRoundsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEdit, listing?.id]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -64,8 +99,8 @@ export function ListingFormDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "매물 수정" : "새 매물 등록"}</DialogTitle>
           <DialogDescription>
-            포트폴리오사 구주를 매물로 등록합니다. 보유 수량·취득가 등 cap
-            table 정보는 다루지 않습니다.
+            포트폴리오사 구주를 매물로 등록합니다. 투자 데이터(라운드별 단가·주식수)는
+            선택 입력이며 EXIT 시나리오 계산에 사용됩니다.
           </DialogDescription>
         </DialogHeader>
 
@@ -84,7 +119,7 @@ export function ListingFormDialog({
             <Field label="상태">
               <Select
                 name="status"
-                defaultValue={listing?.status ?? "세일즈중"}
+                defaultValue={listing?.status ?? "LIVE"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="선택" />
@@ -125,23 +160,6 @@ export function ListingFormDialog({
             </Field>
           </div>
 
-          <Field label="최신 라운드 밸류 (KRW)" htmlFor="asking_valuation">
-            <MoneyInput
-              id="asking_valuation"
-              name="asking_valuation"
-              placeholder="50,000,000,000"
-              defaultValue={listing?.asking_valuation}
-            />
-          </Field>
-
-          <Field label="한 줄 매물 소개" htmlFor="summary">
-            <Textarea
-              id="summary"
-              name="summary"
-              defaultValue={listing?.summary ?? ""}
-            />
-          </Field>
-
           <Field label="IR/티저 자료 링크" htmlFor="deck_url">
             <Input
               id="deck_url"
@@ -179,6 +197,15 @@ export function ListingFormDialog({
             )}
           </div>
 
+          {/* 투자 데이터(선택) — EXIT 시나리오 소스 */}
+          {isEdit && roundsSeed === null ? (
+            <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
+              투자 데이터 불러오는 중…
+            </div>
+          ) : (
+            <RoundsEditor initial={roundsSeed ?? []} />
+          )}
+
           {state && !state.ok && (
             <p className="text-sm text-destructive" role="alert">
               {state.error}
@@ -191,7 +218,7 @@ export function ListingFormDialog({
                 취소
               </Button>
             </DialogClose>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || (isEdit && roundsLoading)}>
               {pending ? "저장 중…" : "저장"}
             </Button>
           </DialogFooter>

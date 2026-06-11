@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 
 // 인증 없이 접근 가능한 경로
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/signup"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -56,8 +56,8 @@ export async function updateSession(request: NextRequest) {
     return copyCookies(supabaseResponse, NextResponse.redirect(url));
   }
 
-  // 인증됨 + 로그인 화면 → 홈으로
-  if (user && pathname === "/login") {
+  // 인증됨 + 로그인/가입 화면 → 홈으로 (승인 여부는 (app) 레이아웃에서 판정)
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return copyCookies(supabaseResponse, NextResponse.redirect(url));

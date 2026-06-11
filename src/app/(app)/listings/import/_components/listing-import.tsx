@@ -14,7 +14,7 @@ const NONE = "__none__";
 
 const FIELDS: ImportField[] = [
   { key: "company_name", label: "회사명", required: true },
-  { key: "status", label: "상태 (세일즈중/거래완료/보류)" },
+  { key: "status", label: "상태 (LIVE/ON SALE/EXIT/W/O)" },
   { key: "sector", label: "섹터" },
   { key: "stage", label: "투자 단계 (Series A 등)" },
   { key: "asking_valuation", label: "최신 라운드 밸류" },
@@ -71,7 +71,7 @@ export function ListingImport() {
       requiredKey="company_name"
       unit="매물"
       placeholder={
-        "회사명,상태,섹터,최신 라운드 밸류,소속 운용펀드\n예시컴퍼니,세일즈중,헬스케어/바이오,50000000000,스파크 1호 조합"
+        "회사명,상태,섹터,최신 라운드 밸류,소속 운용펀드\n예시컴퍼니,ON SALE,헬스케어/바이오,50000000000,스파크 1호 조합"
       }
       previewColumns={[
         { key: "company_name", label: "회사명" },
@@ -94,7 +94,7 @@ export function ListingImport() {
         ],
         example: [
           "예시컴퍼니",
-          "세일즈중",
+          "ON SALE",
           "헬스케어/바이오",
           "Series B",
           "50000000000",

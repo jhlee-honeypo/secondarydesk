@@ -48,6 +48,7 @@ export function InvestorPicker({
 }) {
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [investorId, setInvestorId] = useState("");
+  const [investorType, setInvestorType] = useState("");
   const [fundKeys, setFundKeys] = useState<number[]>([0]);
 
   function addFundRow() {
@@ -120,9 +121,13 @@ export function InvestorPicker({
         <div className="space-y-4 rounded-lg border border-border p-3">
           <div className="grid grid-cols-2 gap-4">
             <Field label="유형">
-              <Select name="investor_type">
+              <input type="hidden" name="investor_type" value={investorType} />
+              <Select
+                value={investorType || undefined}
+                onValueChange={setInvestorType}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="선택 (선택사항)" />
+                  <SelectValue placeholder="선택" />
                 </SelectTrigger>
                 <SelectContent>
                   {INVESTOR_TYPES.map((t) => (
@@ -165,7 +170,7 @@ export function InvestorPicker({
 
           <div className="space-y-3 rounded-md bg-muted/40 p-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">조합 (선택)</p>
+              <p className="text-sm font-medium">조합</p>
               <Button
                 type="button"
                 variant="outline"
