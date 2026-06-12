@@ -7,9 +7,29 @@ import { listListingBundles } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function DealsPage() {
+export default async function DealsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ closed?: string }>;
+}) {
   const supabase = await createClient();
   const me = await getCurrentUser();
+  const { closed } = await searchParams;
+  const showClosed = closed === "1";
+
+  // 카드·수정폼이 실제 쓰는 컬럼만 조회한다(select * 는 딜 수천 건에서 불필요한
+  // 컬럼까지 직렬화·전송해 페이로드가 비대해진다).
+  let dealsQuery = supabase
+    .from("deals")
+    .select(
+      "id, stage, next_action, next_action_date, investor_id, listing_id, lost_reason, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at)",
+    )
+    .order("created_at", { ascending: false });
+  // 기본은 진행 중 딜만 로드한다. 종료(클로징·드랍)된 딜은 누적되면 수천 건이 되어
+  // 보드 로드·렌더를 무겁게 하므로, '종료 딜 포함' 토글(?closed=1)일 때만 함께 불러온다.
+  if (!showClosed) {
+    dealsQuery = dealsQuery.not("stage", "in", "(클로징,드랍)");
+  }
 
   const [
     { data: dealRows },
@@ -20,12 +40,7 @@ export default async function DealsPage() {
     { data: holdingFundRows },
     { data: listingFundRows },
   ] = await Promise.all([
-    supabase
-      .from("deals")
-      .select(
-        "*, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at)",
-      )
-      .order("created_at", { ascending: false }),
+    dealsQuery,
     supabase.from("listings").select("id, company_name").order("company_name"),
     supabase.from("investors").select("id, name").order("name"),
     supabase.from("funds").select("id, name, investor_id").order("name"),
@@ -39,7 +54,9 @@ export default async function DealsPage() {
 
   const listingBundles = await listListingBundles();
 
-  const deals = (dealRows ?? []) as DealCard[];
+  // 조회 컬럼을 줄여 supabase-js 가 좁은 타입을 추론하므로 unknown 경유로 캐스팅한다
+  // (카드·수정폼이 쓰는 필드는 모두 select 에 포함됨).
+  const deals = (dealRows ?? []) as unknown as DealCard[];
   const listings = (listingRows ?? []) as { id: string; company_name: string }[];
   const investors = (investorRows ?? []) as { id: string; name: string }[];
   const funds = (fundRows ?? []) as {
@@ -85,6 +102,7 @@ export default async function DealsPage() {
         holdingFunds={holdingFunds}
         listingFundMap={listingFundMap}
         listingBundles={listingBundles}
+        showClosed={showClosed}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -59,6 +60,7 @@ export function DealBoard({
   holdingFunds,
   listingFundMap,
   listingBundles,
+  showClosed,
 }: {
   initialDeals: DealCard[];
   listings: DealOptionListing[];
@@ -69,7 +71,9 @@ export function DealBoard({
   holdingFunds: { id: string; name: string }[];
   listingFundMap: Record<string, string[]>;
   listingBundles: ListingBundle[];
+  showClosed: boolean;
 }) {
+  const router = useRouter();
   const [deals, setDeals] = useState(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -246,6 +250,15 @@ export function DealBoard({
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            type="button"
+            variant={showClosed ? "secondary" : "outline"}
+            onClick={() => router.push(showClosed ? "/deals" : "/deals?closed=1")}
+            title="기본은 진행 중 딜만 표시합니다. 종료(클로징·드랍)된 딜까지 보려면 켜세요."
+          >
+            {showClosed ? "진행 중만" : "종료 딜 포함"}
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
