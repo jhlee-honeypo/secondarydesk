@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Lock, Plus, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,10 @@ export function InvestorPicker({
   // 명함 검색(백데이터 자동완성)
   const [cardQuery, setCardQuery] = useState("");
   const [cardResults, setCardResults] = useState<BusinessCardHit[]>([]);
+  const [cardSearching, setCardSearching] = useState(false);
+  // 디바운스 타이머 + 검색 시퀀스(경쟁요청 방지: 느린 이전 응답이 최신을 덮어쓰지 않게)
+  const cardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardSeqRef = useRef(0);
 
   function addFundRow() {
     setFundKeys((keys) => [...keys, (keys[keys.length - 1] ?? 0) + 1]);
@@ -81,10 +85,29 @@ export function InvestorPicker({
     setFundKeys((keys) => keys.filter((k) => k !== key));
   }
 
-  // 명함 검색 — onChange 핸들러에서 직접 호출(effect 미사용). 이름/소속 부분일치.
-  async function handleCardQuery(v: string) {
+  // 명함 검색 — 디바운스(250ms)로 키 입력마다 검색 발사하지 않고, 최소 2글자부터
+  // 검색한다(1글자는 명함 수천 건을 매번 훑어 느리고 결과도 과다). 시퀀스 비교로
+  // 입력이 더 들어온 뒤 도착한 이전 응답은 버린다.
+  function handleCardQuery(v: string) {
     setCardQuery(v);
-    setCardResults(v.trim() ? await searchBusinessCards(v) : []);
+    if (cardTimerRef.current) clearTimeout(cardTimerRef.current);
+
+    const q = v.trim();
+    if (q.length < 2) {
+      cardSeqRef.current++; // 진행 중 검색 무효화
+      setCardResults([]);
+      setCardSearching(false);
+      return;
+    }
+
+    setCardSearching(true);
+    cardTimerRef.current = setTimeout(async () => {
+      const seq = ++cardSeqRef.current;
+      const hits = await searchBusinessCards(q);
+      if (seq !== cardSeqRef.current) return; // 더 최신 입력이 있었음 → 폐기
+      setCardResults(hits);
+      setCardSearching(false);
+    }, 250);
   }
 
   // 명함 선택 → 폼 자동 채움. 소속이 이미 등록된 투자사면 그 투자사를 선택,
@@ -110,8 +133,12 @@ export function InvestorPicker({
       setContactLocked(true); // 명함 출처 연락처 잠금
       if (showMetDate && card.met_date) onMetDateChange?.(card.met_date);
     }
+    // 선택 후 진행 중인 디바운스 검색이 결과를 다시 채우지 않도록 취소
+    if (cardTimerRef.current) clearTimeout(cardTimerRef.current);
+    cardSeqRef.current++;
     setCardQuery("");
     setCardResults([]);
+    setCardSearching(false);
   }
 
   return (
@@ -152,11 +179,16 @@ export function InvestorPicker({
             ))}
           </div>
         )}
-        {cardQuery.trim() !== "" && cardResults.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            일치하는 명함이 없습니다. 아래에서 직접 입력하세요.
-          </p>
+        {cardSearching && cardResults.length === 0 && (
+          <p className="text-xs text-muted-foreground">검색 중…</p>
         )}
+        {!cardSearching &&
+          cardQuery.trim().length >= 2 &&
+          cardResults.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              일치하는 명함이 없습니다. 아래에서 직접 입력하세요.
+            </p>
+          )}
       </div>
 
       <Field label="투자사" required>
