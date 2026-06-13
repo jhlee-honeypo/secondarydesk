@@ -13,7 +13,8 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { ArrowRight, Bookmark, CalendarPlus, Plus, Trash2, X } from "lucide-react";
+import { ArrowRight, Bookmark, CalendarPlus, FileUp, Plus, Trash2, X } from "lucide-react";
+import Link from "next/link";
 
 import {
   DEAL_STAGES,
@@ -293,6 +294,12 @@ export function DealBoard({
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/deals/import">
+              <FileUp />
+              가져오기
+            </Link>
+          </Button>
           <MeetingLogDialog
             investors={investors}
             trigger={
