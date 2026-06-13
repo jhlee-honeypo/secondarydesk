@@ -162,6 +162,7 @@ function listingPayload(fd: FormData) {
   // 수정 시 기존 값이 유지되고(덮어쓰지 않음), 생성 시에는 null 로 남는다.
   return {
     company_name: requiredText(fd, "company_name"),
+    company_name_en: text(fd, "company_name_en"),
     status: text(fd, "status") ?? "LIVE",
     sector: text(fd, "sector"),
     stage: text(fd, "stage"),
@@ -307,6 +308,7 @@ function holdingFundPayload(fd: FormData) {
   return {
     name: requiredText(fd, "name"),
     short_name: text(fd, "short_name"),
+    commitment: num(fd, "commitment"),
     vintage: intNum(fd, "vintage"),
     maturity_date: text(fd, "maturity_date"),
     status: text(fd, "status"),

@@ -160,6 +160,11 @@ export default async function ListingDetailPage({
             <h1 className="text-2xl font-semibold tracking-tight">
               {listing.company_name}
             </h1>
+            {listing.company_name_en && (
+              <span className="text-base text-muted-foreground">
+                {listing.company_name_en}
+              </span>
+            )}
             <Badge variant={LISTING_STATUS_VARIANT[listing.status]}>
               {LISTING_STATUS_LABEL[listing.status]}
             </Badge>

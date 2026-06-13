@@ -133,6 +133,11 @@ export default async function ListingsPage({
                       >
                         {listing.company_name}
                       </Link>
+                      {listing.company_name_en && (
+                        <div className="text-xs text-muted-foreground">
+                          {listing.company_name_en}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <SectorCell id={listing.id} value={listing.sector} />

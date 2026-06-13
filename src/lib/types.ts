@@ -181,6 +181,8 @@ export const HOLDING_FUND_STATUSES: HoldingFundStatus[] = [
 export type Listing = {
   id: string;
   company_name: string;
+  company_name_en: string | null; // 영문 회사명 (Bubble company.company name eng 연동)
+  bubble_id: string | null; // ERP company._id — 제자리 동기화 멱등 키
   status: ListingStatus;
   sector: string | null;
   stage: string | null;
@@ -197,6 +199,8 @@ export type HoldingFund = {
   id: string;
   name: string;
   short_name: string | null; // 약칭 — 화면 표시용(없으면 name 폴백)
+  commitment: number | null; // 약정액(원) — Bubble fund.fund size 연동
+  bubble_id: string | null; // ERP fund._id — 일괄 동기화 멱등 키
   vintage: number | null;
   maturity_date: string | null;
   status: HoldingFundStatus | null;

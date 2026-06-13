@@ -11,17 +11,28 @@ export function MoneyInput({
   name,
   defaultValue,
   placeholder,
+  value: controlledValue,
+  onValueChange,
 }: {
   id?: string;
   name: string;
   defaultValue?: number | null;
   placeholder?: string;
+  // 제어형: value(숫자) + onValueChange 를 주면 외부 상태로 동작(프리필용).
+  value?: number | null;
+  onValueChange?: (next: number | null) => void;
 }) {
   const format = (digits: string) =>
     digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const [value, setValue] = useState(
+  const controlled = controlledValue !== undefined;
+  const [internal, setInternal] = useState(
     defaultValue != null ? format(String(defaultValue)) : "",
   );
+  const shown = controlled
+    ? controlledValue != null
+      ? format(String(controlledValue))
+      : ""
+    : internal;
 
   return (
     <Input
@@ -29,8 +40,15 @@ export function MoneyInput({
       name={name}
       inputMode="numeric"
       placeholder={placeholder}
-      value={value}
-      onChange={(e) => setValue(format(e.target.value.replace(/[^\d]/g, "")))}
+      value={shown}
+      onChange={(e) => {
+        const digits = e.target.value.replace(/[^\d]/g, "");
+        if (controlled) {
+          onValueChange?.(digits === "" ? null : Number(digits));
+        } else {
+          setInternal(format(digits));
+        }
+      }}
     />
   );
 }

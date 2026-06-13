@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Database, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import {
   HOLDING_FUND_STATUS_VARIANT,
   type HoldingFund,
 } from "@/lib/types";
-import { formatDate, fundLabel } from "@/lib/format";
+import { formatDate, formatKRW, fundLabel } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -46,14 +46,28 @@ export default async function HoldingFundsPage() {
             태깅합니다.
           </p>
         </div>
-        <HoldingFundFormDialog
-          trigger={
-            <Button>
-              <Plus />
-              운용펀드
-            </Button>
-          }
-        />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/listings/sync">
+              <RefreshCw />
+              ERP 동기화
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/listings/erp-funds">
+              <Database />
+              ERP 조합 현황
+            </Link>
+          </Button>
+          <HoldingFundFormDialog
+            trigger={
+              <Button>
+                <Plus />
+                운용펀드
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {funds.length === 0 ? (
@@ -70,6 +84,7 @@ export default async function HoldingFundsPage() {
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-4 py-2.5 font-medium">펀드명</th>
                 <th className="px-4 py-2.5 font-medium">상태</th>
+                <th className="px-4 py-2.5 font-medium">약정액</th>
                 <th className="px-4 py-2.5 font-medium">결성연도</th>
                 <th className="px-4 py-2.5 font-medium">만기일</th>
                 <th className="px-4 py-2.5 font-medium">보유 매물</th>
@@ -98,6 +113,9 @@ export default async function HoldingFundsPage() {
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatKRW(fund.commitment)}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {fund.vintage ?? "—"}

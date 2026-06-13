@@ -19,6 +19,12 @@ function isPublic(pathname: string): boolean {
 }
 
 export async function updateSession(request: NextRequest) {
+  // 크론 등 자체적으로 인증하는 API(CRON_SECRET)는 세션 가드를 우회한다.
+  // 크론 호출엔 세션 쿠키가 없어 가드에 걸리면 /login 으로 리다이렉트돼 버린다.
+  if (request.nextUrl.pathname.startsWith("/api/cron/")) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

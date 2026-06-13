@@ -38,7 +38,11 @@ import {
   updateListing,
   type ActionResult,
 } from "../actions";
+import { lookupBubbleCompanies } from "../bubble-actions";
+import { BubbleLookup } from "./bubble-lookup";
 import { RoundsEditor, type RoundSeed } from "./rounds-editor";
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
 
 export function ListingFormDialog({
   trigger,
@@ -57,6 +61,15 @@ export function ListingFormDialog({
     FormData
   >(isEdit ? updateListing : createListing, undefined);
   const [open, setOpen] = useState(false);
+
+  // Bubble 프리필 대상 필드(제어형)
+  const [companyName, setCompanyName] = useState(listing?.company_name ?? "");
+  const [companyNameEn, setCompanyNameEn] = useState(
+    listing?.company_name_en ?? "",
+  );
+  const [status, setStatus] = useState<string>(listing?.status ?? "LIVE");
+  const [sector, setSector] = useState<string>(listing?.sector ?? "");
+  const [stage, setStage] = useState(listing?.stage ?? "");
 
   // 수정 모드: 저장된 투자 라운드를 다이얼로그 열 때 지연 로드(프리필).
   const [roundsSeed, setRoundsSeed] = useState<RoundSeed[] | null>(
@@ -117,20 +130,79 @@ export function ListingFormDialog({
         <form action={formAction} className="space-y-4">
           {isEdit && <input type="hidden" name="id" value={listing!.id} />}
 
+          {/* Bubble(sparkERP)에서 포트폴리오 회사 불러오기 */}
+          <BubbleLookup
+            label="sparkERP에서 포트폴리오 불러오기"
+            placeholder="회사명 검색 (국문·영문)"
+            search={lookupBubbleCompanies}
+            onPick={(c) => {
+              setCompanyName(c.nameKr);
+              setCompanyNameEn(c.nameEn ?? "");
+              setStatus(c.status);
+              if (c.sector) setSector(c.sector);
+              if (c.lastRoundType) setStage(c.lastRoundType);
+              // 보유 펀드명을 우리 운용펀드와 best-effort 매칭해 자동 태깅
+              if (c.fundNames.length) {
+                const matched = holdingFunds
+                  .filter((hf) =>
+                    c.fundNames.some((fn) => {
+                      const a = norm(fn);
+                      const b = norm(hf.name);
+                      const sn = hf.short_name ? norm(hf.short_name) : "";
+                      return (
+                        a === b ||
+                        b.includes(a) ||
+                        a.includes(b) ||
+                        (sn && (sn === a || sn.includes(a) || a.includes(sn)))
+                      );
+                    }),
+                  )
+                  .map((hf) => hf.id);
+                if (matched.length) {
+                  setFundIds((cur) => Array.from(new Set([...cur, ...matched])));
+                }
+              }
+            }}
+            renderItem={(c) => (
+              <span className="block">
+                <span className="font-medium">{c.nameKr}</span>
+                {c.nameEn && (
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    {c.nameEn}
+                  </span>
+                )}
+                <span className="ml-1.5 text-xs text-muted-foreground">
+                  · {c.status}
+                  {c.sectorRaw ? ` · ${c.sectorRaw}` : ""}
+                </span>
+              </span>
+            )}
+          />
+
           <div className="grid grid-cols-2 gap-4">
-            <Field label="회사명" htmlFor="company_name" required>
+            <Field label="회사명(국문)" htmlFor="company_name" required>
               <Input
                 id="company_name"
                 name="company_name"
-                defaultValue={listing?.company_name ?? ""}
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
                 required
               />
             </Field>
+            <Field label="영문 회사명" htmlFor="company_name_en">
+              <Input
+                id="company_name_en"
+                name="company_name_en"
+                placeholder="English name"
+                value={companyNameEn}
+                onChange={(e) => setCompanyNameEn(e.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <Field label="상태">
-              <Select
-                name="status"
-                defaultValue={listing?.status ?? "LIVE"}
-              >
+              <Select name="status" value={status} onValueChange={setStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
@@ -143,11 +215,12 @@ export function ListingFormDialog({
                 </SelectContent>
               </Select>
             </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <Field label="섹터">
-              <Select name="sector" defaultValue={listing?.sector ?? undefined}>
+              <Select
+                name="sector"
+                value={sector || undefined}
+                onValueChange={setSector}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="선택" />
                 </SelectTrigger>
@@ -160,25 +233,28 @@ export function ListingFormDialog({
                 </SelectContent>
               </Select>
             </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <Field label="단계(stage)" htmlFor="stage">
               <Input
                 id="stage"
                 name="stage"
                 placeholder="Series B 등"
-                defaultValue={listing?.stage ?? ""}
+                value={stage}
+                onChange={(e) => setStage(e.target.value)}
+              />
+            </Field>
+            <Field label="IR/티저 자료 링크" htmlFor="deck_url">
+              <Input
+                id="deck_url"
+                name="deck_url"
+                type="url"
+                placeholder="https://"
+                defaultValue={listing?.deck_url ?? ""}
               />
             </Field>
           </div>
-
-          <Field label="IR/티저 자료 링크" htmlFor="deck_url">
-            <Input
-              id="deck_url"
-              name="deck_url"
-              type="url"
-              placeholder="https://"
-              defaultValue={listing?.deck_url ?? ""}
-            />
-          </Field>
 
           {/* 운용펀드 태깅 (ListingFund) — 여러 펀드 중복 소속 허용 */}
           <div className="space-y-2 rounded-lg border border-border p-3">
