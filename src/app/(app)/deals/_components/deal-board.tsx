@@ -17,14 +17,12 @@ import { ArrowRight, Bookmark, CalendarPlus, Plus, Trash2, X } from "lucide-reac
 
 import {
   DEAL_STAGES,
-  DEAL_STAGE_VARIANT,
   type DealCard,
   type DealStage,
   type UserRow,
 } from "@/lib/types";
 import { formatDate, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +45,39 @@ import { deleteDeal, updateDealStage, type ListingBundle } from "../actions";
 
 const ALL = "all";
 const VIEWS_KEY = "secondarydesk:deal-views";
+
+// 단계별 색상 — 컬럼 패널 음영/인디케이터/카드 좌측 바를 한 벌로 묶어
+// 보드에서 단계 경계가 한눈에 구분되도록 한다(디자인 레퍼런스 기준).
+const STAGE_STYLE: Record<
+  DealStage,
+  { panel: string; accent: string; bar: string }
+> = {
+  컨택: {
+    panel: "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40",
+    accent: "bg-slate-400",
+    bar: "bg-slate-300 dark:bg-slate-600",
+  },
+  기업소개: {
+    panel: "border-sky-200 bg-sky-50/70 dark:border-sky-900 dark:bg-sky-950/30",
+    accent: "bg-sky-400",
+    bar: "bg-sky-300 dark:bg-sky-700",
+  },
+  "IR·실사": {
+    panel: "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/30",
+    accent: "bg-amber-400",
+    bar: "bg-amber-300 dark:bg-amber-700",
+  },
+  클로징: {
+    panel: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/30",
+    accent: "bg-emerald-500",
+    bar: "bg-emerald-400 dark:bg-emerald-600",
+  },
+  드랍: {
+    panel: "border-rose-200 bg-rose-50/70 dark:border-rose-900 dark:bg-rose-950/30",
+    accent: "bg-rose-400",
+    bar: "bg-rose-300 dark:bg-rose-700",
+  },
+};
 
 type SavedView = { name: string; listing: string; owner: string; fund?: string };
 
@@ -390,22 +421,30 @@ function Column({
   };
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
+  const style = STAGE_STYLE[stage];
 
   return (
-    <div className="flex min-w-0 flex-col">
-      <div className="mb-2 flex items-center justify-between px-1">
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex min-w-0 flex-col rounded-xl border p-2 transition-colors",
+        style.panel,
+        isOver && "ring-2 ring-primary/50",
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between px-1 pt-0.5">
         <span className="flex items-center gap-2 text-sm font-medium">
-          <Badge variant={DEAL_STAGE_VARIANT[stage]}>{stage}</Badge>
+          <span
+            className={cn("h-4 w-1.5 shrink-0 rounded-full", style.accent)}
+            aria-hidden
+          />
+          {stage}
         </span>
-        <span className="text-xs text-muted-foreground">{deals.length}</span>
+        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          {deals.length}
+        </span>
       </div>
-      <div
-        ref={setNodeRef}
-        className={cn(
-          "flex min-h-24 flex-1 flex-col gap-2 rounded-lg bg-muted/40 p-2 transition-colors",
-          isOver && "bg-primary/10 ring-1 ring-primary/40",
-        )}
-      >
+      <div className="flex min-h-24 flex-1 flex-col gap-2">
         {deals.map((deal) => (
           <DraggableCard
             key={deal.id}
@@ -516,12 +555,20 @@ function DealCardView({
   return (
     <div
       className={cn(
-        "group rounded-lg border border-border bg-card text-sm shadow-xs",
+        "group relative rounded-lg border border-border bg-card text-sm shadow-xs",
         dragging && "cursor-grabbing shadow-md",
       )}
     >
+      {/* 단계 색상 좌측 바 — 컬럼 음영과 함께 단계 구분을 보강 */}
+      <span
+        className={cn(
+          "absolute inset-y-2 left-0 w-1 rounded-r",
+          STAGE_STYLE[deal.stage].bar,
+        )}
+        aria-hidden
+      />
       {/* 헤더(항상 표시): 매물명 → 투자사명 */}
-      <div className="flex items-center gap-1.5 px-3 py-2">
+      <div className="flex items-center gap-1.5 py-2 pl-3.5 pr-3">
         <span className="min-w-0 flex-1 truncate leading-tight">
           <span className="font-medium text-foreground">
             {deal.listing?.company_name ?? "—"}
@@ -554,7 +601,7 @@ function DealCardView({
       {/* 상세(호버 시 높이가 부드럽게 펼쳐짐 — grid-rows 0fr→1fr) */}
       <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-200 ease-out group-hover:grid-rows-[1fr]">
         <div className="overflow-hidden">
-          <div className="px-3 pb-3">
+          <div className="pb-3 pl-3.5 pr-3">
             <div className="flex items-center justify-end text-xs text-muted-foreground">
               <span>
                 {deal.owner?.first_name ??
