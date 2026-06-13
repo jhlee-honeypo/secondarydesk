@@ -211,8 +211,8 @@ export async function runErpSync(supabase: SyncClient): Promise<ApplyResult> {
   }
 
   revalidatePath("/listings");
-  revalidatePath("/listings/funds");
-  revalidatePath("/listings/erp-funds");
-  revalidatePath("/listings/sync");
+  revalidatePath("/funds");
+  revalidatePath("/funds/erp");
+  revalidatePath("/funds/sync");
   return { ok: true, fundsCreated, fundsUpdated, listingsUpdated, fundLinksAdded };
 }

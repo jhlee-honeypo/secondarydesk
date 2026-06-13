@@ -101,8 +101,8 @@ export async function syncErpFunds(): Promise<SyncResult> {
     }
   }
 
-  revalidatePath("/listings/funds");
+  revalidatePath("/funds");
   revalidatePath("/listings");
-  revalidatePath("/listings/erp-funds");
+  revalidatePath("/funds/erp");
   return { ok: true, created, updated };
 }

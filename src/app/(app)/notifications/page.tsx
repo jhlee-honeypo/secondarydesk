@@ -89,7 +89,7 @@ export default async function NotificationsPage() {
             {holdingFunds.map((f) => (
               <Link
                 key={f.id}
-                href="/listings/funds"
+                href="/funds"
                 className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 hover:bg-muted/40"
               >
                 <span className="text-sm font-medium" title={f.name}>

@@ -6,6 +6,7 @@ import {
   Building2,
   Calculator,
   KanbanSquare,
+  Landmark,
   LayoutDashboard,
   Package,
   Users,
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/deals", label: "딜 보드", icon: KanbanSquare, ready: true },
   { href: "/investors", label: "투자사", icon: Building2, ready: true },
   { href: "/listings", label: "매물", icon: Package, ready: true },
+  { href: "/funds", label: "운용펀드", icon: Landmark, ready: true },
   { href: "/exit-scenario", label: "EXIT Simulator", icon: Calculator, ready: true },
 ];
 

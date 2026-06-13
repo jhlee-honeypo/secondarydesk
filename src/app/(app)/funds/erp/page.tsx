@@ -30,7 +30,7 @@ export default async function ErpFundsPage() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <Link
-        href="/listings/funds"
+        href="/funds"
         className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← 운용펀드

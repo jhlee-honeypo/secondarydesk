@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DeleteDialog } from "@/components/app/delete-dialog";
-import { HoldingFundFormDialog } from "../_components/holding-fund-form-dialog";
-import { deleteHoldingFund } from "../actions";
+import { HoldingFundFormDialog } from "../listings/_components/holding-fund-form-dialog";
+import { deleteHoldingFund } from "../listings/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -31,13 +31,6 @@ export default async function HoldingFundsPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
-      <Link
-        href="/listings"
-        className="text-sm text-muted-foreground hover:text-foreground"
-      >
-        ← 매물 목록
-      </Link>
-
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">운용펀드</h1>
@@ -48,13 +41,13 @@ export default async function HoldingFundsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>
-            <Link href="/listings/sync">
+            <Link href="/funds/sync">
               <RefreshCw />
               ERP 동기화
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/listings/erp-funds">
+            <Link href="/funds/erp">
               <Database />
               ERP 조합 현황
             </Link>

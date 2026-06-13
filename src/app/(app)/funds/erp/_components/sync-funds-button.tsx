@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { DownloadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { syncErpFunds, type SyncResult } from "../../bubble-actions";
+import { syncErpFunds, type SyncResult } from "../../../listings/bubble-actions";
 
 // ERP 조합 → 운용펀드 일괄 동기화 버튼. effect 미사용.
 export function SyncFundsButton() {

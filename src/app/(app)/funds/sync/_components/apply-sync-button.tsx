@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { applyErpSync, type ApplyResult } from "../../sync-actions";
+import { applyErpSync, type ApplyResult } from "../../../listings/sync-actions";
 
 // 미리보기 확인 후 동기화 적용. 성공 시 router.refresh 로 미리보기 재계산.
 export function ApplySyncButton({ disabled }: { disabled?: boolean }) {

@@ -328,7 +328,7 @@ export async function createHoldingFund(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/listings/funds");
+  revalidatePath("/funds");
   revalidatePath("/listings");
   return { ok: true };
 }
@@ -350,7 +350,7 @@ export async function updateHoldingFund(
 
   if (error) return { ok: false, error: error.message };
 
-  revalidatePath("/listings/funds");
+  revalidatePath("/funds");
   revalidatePath("/listings");
   return { ok: true };
 }
@@ -359,6 +359,6 @@ export async function deleteHoldingFund(id: string): Promise<void> {
   const supabase = await createClient();
   // listing_funds 는 FK on delete cascade 로 함께 정리됨.
   await supabase.from("holding_funds").delete().eq("id", id);
-  revalidatePath("/listings/funds");
+  revalidatePath("/funds");
   revalidatePath("/listings");
 }

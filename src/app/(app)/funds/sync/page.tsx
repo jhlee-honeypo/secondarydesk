@@ -4,7 +4,7 @@ import { ArrowRight, Database } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatWon } from "@/lib/format";
-import { getSyncPreview } from "../sync-actions";
+import { getSyncPreview } from "../../listings/sync-actions";
 import { ApplySyncButton } from "./_components/apply-sync-button";
 import { ManualMatch } from "./_components/manual-match";
 
@@ -41,7 +41,7 @@ export default async function SyncPage() {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <Link
-        href="/listings/funds"
+        href="/funds"
         className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← 운용펀드

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { SearchableSelect } from "@/components/app/searchable-select";
-import { setListingErpMatch } from "../../sync-actions";
+import { setListingErpMatch } from "../../../listings/sync-actions";
 
 type ErpOption = { id: string; label: string };
 

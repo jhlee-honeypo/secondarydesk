@@ -162,7 +162,7 @@ export async function setListingErpMatch(
     }
     return { ok: false, error: error.message };
   }
-  revalidatePath("/listings/sync");
+  revalidatePath("/funds/sync");
   return { ok: true };
 }
 
