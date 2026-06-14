@@ -644,16 +644,18 @@ export async function updateStageEvent(
 ): Promise<ActionResult> {
   if (!eventId) return { ok: false, error: "잘못된 요청입니다." };
 
-  const args: { p_event_id: string; p_stage?: DealStage; p_changed_at?: string } =
-    { p_event_id: eventId };
-  if (patch.stage && isStage(patch.stage)) args.p_stage = patch.stage;
-  if (patch.changed_at) args.p_changed_at = patch.changed_at;
-  if (args.p_stage === undefined && args.p_changed_at === undefined) {
-    return { ok: true };
-  }
+  const stage = patch.stage && isStage(patch.stage) ? patch.stage : null;
+  const changedAt = patch.changed_at ? patch.changed_at : null;
+  if (stage === null && changedAt === null) return { ok: true };
 
+  // PostgREST 오버로드/기본값 해석 모호함을 피하려 항상 3개 인자를 명시(미지정은
+  // null → 함수에서 coalesce 로 기존값 유지).
   const supabase = await createClient();
-  const { error } = await supabase.rpc("update_stage_event_resync", args);
+  const { error } = await supabase.rpc("update_stage_event_resync", {
+    p_event_id: eventId,
+    p_stage: stage,
+    p_changed_at: changedAt,
+  });
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/deals");
