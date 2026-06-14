@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
 import { loadAnalytics } from "@/lib/analytics";
-import { loadNotifications } from "@/lib/notifications";
-import { formatDate, formatKRW } from "@/lib/format";
+import { formatKRW } from "@/lib/format";
 import { DEAL_STAGE_VARIANT } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,13 +17,10 @@ export default async function DashboardHome({
   const { period = "", fund = "" } = await searchParams;
   const periodDays = period && /^\d+$/.test(period) ? Number(period) : null;
 
-  const [a, notif] = await Promise.all([
-    loadAnalytics({ periodDays, fundId: fund || null }),
-    loadNotifications(),
-  ]);
+  const a = await loadAnalytics({ periodDays, fundId: fund || null });
 
   const maxFunnel = Math.max(1, ...a.funnel.map((f) => f.count));
-  const topActions = notif.actionDeals.slice(0, 5);
+  const coverageLabel = fund ? "노출 매물 / 조합 기업" : "노출 매물 / 전체 매물";
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -33,7 +28,7 @@ export default async function DashboardHome({
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">대시보드</h1>
           <p className="text-sm text-muted-foreground">
-            파이프라인 현황과 오늘의 액션을 한눈에 봅니다.
+            파이프라인 현황과 매물·투자사 진척을 한눈에 봅니다.
           </p>
         </div>
         <DashboardFilters
@@ -46,12 +41,12 @@ export default async function DashboardHome({
       {/* 핵심 지표 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Metric label="진행 중 딜" value={`${a.activeDealCount}건`} />
-        <Metric label="합산 예상금액" value={formatKRW(a.expectedSum)} />
+        <Metric label="컨택 투자사" value={`${a.contactedInvestorCount}곳`} />
         <Metric
-          label="평균 cycle time"
-          value={a.avgCycleDays === null ? "—" : `${a.avgCycleDays}일`}
+          label={coverageLabel}
+          value={`${a.exposedListingCount} / ${a.totalListingCount}`}
         />
-        <Metric label="이번주 활동" value={`${a.weekActivityCount}건`} />
+        <Metric label="클로징" value={`${a.closedCount}건`} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -89,57 +84,45 @@ export default async function DashboardHome({
           </CardContent>
         </Card>
 
-        {/* 오늘의 액션 (F10) */}
+        {/* 정체 딜 — 비종료 단계에서 오래 멈춘 딜(팔로업 필요) */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-base">오늘의 액션</CardTitle>
-              <Link
-                href="/notifications"
-                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                알림 전체 <ArrowRight className="size-3.5" />
-              </Link>
-            </div>
+            <CardTitle className="text-base">
+              정체 딜{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                {STALE_LABEL}
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {topActions.length === 0 ? (
+            {a.staleDeals.length === 0 ? (
               <p className="px-4 pb-4 text-sm text-muted-foreground">
-                예정일이 임박했거나 지난 딜이 없습니다.
+                {STALE_LABEL} 멈춘 딜이 없습니다.
               </p>
             ) : (
               <div className="border-t border-border">
-                {topActions.map((deal) => {
-                  const overdue =
-                    !!deal.next_action_date &&
-                    deal.next_action_date < notif.todayStr;
-                  return (
-                    <Link
-                      key={deal.id}
-                      href="/deals"
-                      className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 last:border-0 hover:bg-muted/40"
-                    >
-                      <span className="min-w-0 truncate text-sm">
-                        <span className="font-medium">
-                          {deal.listing?.company_name ?? "—"}
-                        </span>{" "}
-                        <span className="text-muted-foreground">
-                          · {deal.investor?.name ?? "—"}
-                        </span>
+                {a.staleDeals.map((s) => (
+                  <Link
+                    key={s.id}
+                    href="/deals"
+                    className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 last:border-0 hover:bg-muted/40"
+                  >
+                    <span className="min-w-0 truncate text-sm">
+                      <span className="font-medium">{s.listingName}</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {s.investorName}
                       </span>
-                      <span
-                        className={
-                          overdue
-                            ? "shrink-0 text-xs font-medium text-destructive"
-                            : "shrink-0 text-xs text-muted-foreground"
-                        }
-                      >
-                        {overdue && "● "}
-                        {formatDate(deal.next_action_date)}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs">
+                      <Badge variant={DEAL_STAGE_VARIANT[s.stage]}>
+                        {s.stage}
+                      </Badge>
+                      <span className="font-medium text-muted-foreground tabular-nums">
+                        {s.days}일째
                       </span>
-                    </Link>
-                  );
-                })}
+                    </span>
+                  </Link>
+                ))}
               </div>
             )}
           </CardContent>
@@ -197,6 +180,57 @@ export default async function DashboardHome({
         )}
       </Card>
 
+      {/* 투자사별 진척 */}
+      <Card className="p-0">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <h2 className="text-base font-medium">투자사별 진척</h2>
+        </div>
+        {a.investorProgress.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground">
+            집계할 딜이 없습니다.
+          </p>
+        ) : (
+          <table className="mt-2 w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="px-4 py-2.5 font-medium">투자사</th>
+                <th className="px-4 py-2.5 font-medium">컨택 매물 수</th>
+                <th className="px-4 py-2.5 font-medium">최고 도달 단계</th>
+              </tr>
+            </thead>
+            <tbody>
+              {a.investorProgress.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-b border-border last:border-0 hover:bg-muted/40"
+                >
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/investors/${row.id}`}
+                      className="font-medium text-foreground hover:text-primary hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {row.listingCount}건
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.topStage ? (
+                      <Badge variant={DEAL_STAGE_VARIANT[row.topStage]}>
+                        {row.topStage}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
       {/* 드랍 분석 */}
       <Card>
         <CardHeader>
@@ -225,6 +259,8 @@ export default async function DashboardHome({
     </div>
   );
 }
+
+const STALE_LABEL = "30일 이상 미진척";
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (

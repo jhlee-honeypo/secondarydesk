@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   Calculator,
+  Compass,
   KanbanSquare,
   Landmark,
   LayoutDashboard,
@@ -15,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
+  { href: "/guide", label: "알아보기", icon: Compass, ready: true },
   { href: "/", label: "대시보드", icon: LayoutDashboard, ready: true },
   { href: "/deals", label: "딜 보드", icon: KanbanSquare, ready: true },
   { href: "/investors", label: "투자사", icon: Building2, ready: true },
