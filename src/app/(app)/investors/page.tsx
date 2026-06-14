@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Contact, Upload } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
-import type { InvestorWithOwner } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InvestorTable } from "./_components/investor-table";
@@ -12,12 +11,27 @@ export const dynamic = "force-dynamic";
 export default async function InvestorsPage() {
   const supabase = await createClient();
 
+  // 투자사별 조합(funds)·딜을 임베드해 조합 수·결성총액 합·매칭 딜 수를 집계한다.
   const { data: investors } = await supabase
     .from("investors")
-    .select("*, owner:users(name, email)")
-    .order("created_at", { ascending: false });
+    .select("id, name, funds(aum), deals(id)");
 
-  const rows = (investors ?? []) as InvestorWithOwner[];
+  const data = (investors ?? []) as unknown as {
+    id: string;
+    name: string;
+    funds: { aum: number | null }[] | null;
+    deals: { id: string }[] | null;
+  }[];
+  const rows = data
+    .map((inv) => ({
+      id: inv.id,
+      name: inv.name,
+      fundCount: inv.funds?.length ?? 0,
+      aumSum: (inv.funds ?? []).reduce((s, f) => s + (f.aum ?? 0), 0),
+      dealCount: inv.deals?.length ?? 0,
+    }))
+    // 매칭 딜 많은 순 → 같은 건수(특히 0건)는 결성총액 큰 순
+    .sort((a, b) => b.dealCount - a.dealCount || b.aumSum - a.aumSum);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">

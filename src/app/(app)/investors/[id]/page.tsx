@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import {
   DEAL_STAGE_VARIANT,
-  SECONDARY_APPETITE_VARIANT,
   type ActivityCard,
   type Contact,
   type DealCard,
@@ -18,12 +17,6 @@ import { formatDate, formatKRW } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import { InvestorFormDialog } from "../_components/investor-form-dialog";
 import { FundFormDialog } from "../_components/fund-form-dialog";
 import { ContactFormDialog } from "../_components/contact-form-dialog";
@@ -32,11 +25,7 @@ import { DealFormDialog } from "../../deals/_components/deal-form-dialog";
 import { deleteDeal } from "../../deals/actions";
 import { ActivityFormDialog } from "../../activities/_components/activity-form-dialog";
 import { ActivityTimeline } from "../../activities/_components/activity-timeline";
-import {
-  deleteContact,
-  deleteFund,
-  deleteInvestor,
-} from "../actions";
+import { deleteContact, deleteFund, deleteInvestor } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -58,12 +47,8 @@ export default async function InvestorDetailPage({
     { data: listingRows },
     { data: activityRows },
   ] = await Promise.all([
-    supabase
-      .from("investors")
-      .select("*, owner:users(name, email)")
-      .eq("id", id)
-      .single(),
-    supabase.from("funds").select("*").eq("investor_id", id).order("created_at"),
+    supabase.from("investors").select("*").eq("id", id).single(),
+    supabase.from("funds").select("*").eq("investor_id", id).order("name"),
     supabase
       .from("contacts")
       .select("*")
@@ -120,13 +105,11 @@ export default async function InvestorDetailPage({
     label: d.listing?.company_name ?? "딜",
   }));
 
-  // 소개 경로(F8): intro 정보가 하나라도 있는 딜
-  const introDeals = deals.filter(
-    (d) => d.intro_source || d.intro_relationship || d.intro_date,
-  );
+  // 조합 결성약정총액 합
+  const aumSum = funds.reduce((s, f) => s + (f.aum ?? 0), 0);
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-8">
       <Link
         href="/investors"
         className="text-sm text-muted-foreground hover:text-foreground"
@@ -136,16 +119,11 @@ export default async function InvestorDetailPage({
 
       {/* 헤더 */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {investor.name}
-            </h1>
-            {investor.type && <Badge variant="outline">{investor.type}</Badge>}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            담당 {investor.owner?.name ?? investor.owner?.email ?? "—"}
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {investor.name}
+          </h1>
+          {investor.type && <Badge variant="outline">{investor.type}</Badge>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -173,95 +151,113 @@ export default async function InvestorDetailPage({
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">개요</TabsTrigger>
-          <TabsTrigger value="funds">조합 ({funds.length})</TabsTrigger>
-          <TabsTrigger value="contacts">컨택 ({contacts.length})</TabsTrigger>
-          <TabsTrigger value="deals">딜 ({deals.length})</TabsTrigger>
-          <TabsTrigger value="intro">소개경로</TabsTrigger>
-          <TabsTrigger value="activity">활동 ({activities.length})</TabsTrigger>
-        </TabsList>
-
-        {/* 개요 */}
-        <TabsContent value="overview">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">개요</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <p className="whitespace-pre-wrap text-foreground">
-                {investor.description ?? (
-                  <span className="text-muted-foreground">
-                    아직 등록된 개요·성향 메모가 없습니다.
-                  </span>
-                )}
-              </p>
-              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-muted-foreground sm:grid-cols-3">
-                <div>
-                  <dt className="text-xs">유형</dt>
-                  <dd className="text-foreground">{investor.type ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs">만난 일자</dt>
-                  <dd className="text-foreground">
-                    {investor.met_date ? formatDate(investor.met_date) : "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs">등록일</dt>
-                  <dd className="text-foreground">
-                    {formatDate(investor.created_at)}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 조합 */}
-        <TabsContent value="funds">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                운용 조합 (Funds)
-              </h2>
-              <FundFormDialog
-                investorId={investor.id}
-                trigger={
-                  <Button size="sm">
-                    <Plus />
-                    조합
-                  </Button>
-                }
-              />
+      {/* 개요 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">개요</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <p className="whitespace-pre-wrap text-foreground">
+            {investor.description ?? (
+              <span className="text-muted-foreground">
+                아직 등록된 개요·성향 메모가 없습니다.
+              </span>
+            )}
+          </p>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-muted-foreground sm:grid-cols-3">
+            <div>
+              <dt className="text-xs">유형</dt>
+              <dd className="text-foreground">{investor.type ?? "—"}</dd>
             </div>
+            <div>
+              <dt className="text-xs">만난 일자</dt>
+              <dd className="text-foreground">
+                {investor.met_date ? formatDate(investor.met_date) : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs">조합 / 결성약정총액 합</dt>
+              <dd className="text-foreground">
+                {funds.length}개 · {formatKRW(aumSum)}
+              </dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
 
-            {funds.length === 0 ? (
-              <Card className="items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  등록된 조합이 없습니다.
-                </p>
-              </Card>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {funds.map((fund) => (
-                  <Card key={fund.id} size="sm">
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-sm">{fund.name}</CardTitle>
-                        <div className="flex items-center gap-1">
-                          {fund.secondary_appetite && (
-                            <Badge
-                              variant={
-                                SECONDARY_APPETITE_VARIANT[
-                                  fund.secondary_appetite
-                                ]
-                              }
-                            >
-                              구주 {fund.secondary_appetite}
-                            </Badge>
-                          )}
+      {/* 운용 조합 */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">
+            운용 조합{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              ({funds.length})
+            </span>
+          </h2>
+          <FundFormDialog
+            investorId={investor.id}
+            trigger={
+              <Button size="sm">
+                <Plus />
+                조합
+              </Button>
+            }
+          />
+        </div>
+
+        {funds.length === 0 ? (
+          <Card className="items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              등록된 조합이 없습니다.
+            </p>
+          </Card>
+        ) : (
+          <Card className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs whitespace-nowrap text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">조합명</th>
+                    <th className="px-4 py-2.5 font-medium">등록연도</th>
+                    <th className="px-4 py-2.5 font-medium">만기일</th>
+                    <th className="px-4 py-2.5 font-medium">목적구분</th>
+                    <th className="px-4 py-2.5 font-medium">투자분야</th>
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      결성약정총액
+                    </th>
+                    <th className="w-16 px-4 py-2.5">
+                      <span className="sr-only">관리</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funds.map((fund) => (
+                    <tr
+                      key={fund.id}
+                      className="border-b border-border last:border-0 align-top hover:bg-muted/40"
+                    >
+                      <td className="px-4 py-3 font-medium">{fund.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
+                        {fund.vintage ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
+                        {fund.maturity_date
+                          ? formatDate(fund.maturity_date)
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {fund.main_purpose ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {fund.sector_focus?.length
+                          ? fund.sector_focus.join(", ")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+                        {fund.aum ? formatKRW(fund.aum) : "—"}
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex justify-end gap-1">
                           <FundFormDialog
                             investorId={investor.id}
                             fund={fund}
@@ -290,342 +286,247 @@ export default async function InvestorDetailPage({
                             action={deleteFund.bind(null, fund.id, investor.id)}
                           />
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            드라이파우더
-                          </p>
-                          <p className="font-medium">
-                            {formatKRW(fund.dry_powder)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">만기일</p>
-                          <p className="font-medium">
-                            {formatDate(fund.maturity_date)}
-                          </p>
-                        </div>
-                      </div>
-                      {fund.main_purpose && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">주목적</p>
-                          <p>{fund.main_purpose}</p>
-                        </div>
-                      )}
-                      {(fund.stage_focus?.length || fund.sector_focus?.length) ? (
-                        <div className="flex flex-wrap gap-1">
-                          {fund.stage_focus?.map((s) => (
-                            <Badge key={`st-${s}`} variant="outline">
-                              {s}
-                            </Badge>
-                          ))}
-                          {fund.sector_focus?.map((s) => (
-                            <Badge key={`se-${s}`} variant="secondary">
-                              {s}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* 컨택 */}
-        <TabsContent value="contacts">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                네트워크 (Contacts)
-              </h2>
-              <ContactFormDialog
-                investorId={investor.id}
-                trigger={
-                  <Button size="sm">
-                    <Plus />
-                    컨택
-                  </Button>
-                }
-              />
-            </div>
-
-            {contacts.length === 0 ? (
-              <Card className="items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  등록된 컨택이 없습니다.
-                </p>
-              </Card>
-            ) : (
-              <Card className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                      <th className="px-4 py-2.5 font-medium">이름</th>
-                      <th className="px-4 py-2.5 font-medium">직책</th>
-                      <th className="px-4 py-2.5 font-medium">연락처</th>
-                      <th className="px-4 py-2.5 font-medium">최근 컨택</th>
-                      <th className="px-4 py-2.5" />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {contacts.map((contact) => (
-                      <tr
-                        key={contact.id}
-                        className="border-b border-border last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1.5 font-medium">
-                            {contact.is_decision_maker && (
-                              <Star
-                                className="size-3.5 fill-primary text-primary"
-                                aria-label="의사결정권자"
-                              />
-                            )}
-                            {contact.name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {contact.title ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {contact.email ?? contact.phone ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(contact.last_contacted_at)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-1">
-                            <ContactFormDialog
-                              investorId={investor.id}
-                              contact={contact}
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  aria-label="컨택 수정"
-                                >
-                                  <Pencil />
-                                </Button>
-                              }
-                            />
-                            <DeleteDialog
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  aria-label="컨택 삭제"
-                                >
-                                  <Trash2 />
-                                </Button>
-                              }
-                              title="컨택을 삭제할까요?"
-                              description={`'${contact.name}' 컨택을 삭제합니다.`}
-                              action={deleteContact.bind(
-                                null,
-                                contact.id,
-                                investor.id,
-                              )}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* 딜 — 이 투자사에 연결된 딜(매물 × 투자사) */}
-        <TabsContent value="deals">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                연결된 딜 (매물 × 이 투자사)
-              </h2>
-              <DealFormDialog
-                {...dealDialogProps}
-                trigger={
-                  <Button size="sm">
-                    <Plus />딜
-                  </Button>
-                }
-              />
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </Card>
+        )}
+      </section>
 
-            {deals.length === 0 ? (
-              <Card className="items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  연결된 딜이 없습니다. 매물을 골라 첫 딜을 만들어 보세요.
-                </p>
-              </Card>
-            ) : (
-              <Card className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                      <th className="px-4 py-2.5 font-medium">매물</th>
-                      <th className="px-4 py-2.5 font-medium">단계</th>
-                      <th className="px-4 py-2.5 font-medium">담당</th>
-                      <th className="px-4 py-2.5 font-medium">예상금액</th>
-                      <th className="px-4 py-2.5" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deals.map((deal) => (
-                      <tr
-                        key={deal.id}
-                        className="border-b border-border last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/listings/${deal.listing_id}`}
-                            className="font-medium text-foreground hover:text-primary hover:underline"
-                          >
-                            {deal.listing?.company_name ?? "—"}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={DEAL_STAGE_VARIANT[deal.stage]}>
-                            {deal.stage}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {deal.owner?.name ?? deal.owner?.email ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatKRW(deal.expected_amount)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-1">
-                            <DealFormDialog
-                              {...dealDialogProps}
-                              deal={deal}
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  aria-label="딜 수정"
-                                >
-                                  <Pencil />
-                                </Button>
-                              }
-                            />
-                            <DeleteDialog
-                              trigger={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  aria-label="딜 삭제"
-                                >
-                                  <Trash2 />
-                                </Button>
-                              }
-                              title="딜을 삭제할까요?"
-                              description={`'${deal.listing?.company_name ?? ""}' 딜을 삭제합니다.`}
-                              action={deleteDeal.bind(null, deal.id, undefined)}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
+      {/* 컨택 */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">
+            컨택{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              ({contacts.length})
+            </span>
+          </h2>
+          <ContactFormDialog
+            investorId={investor.id}
+            trigger={
+              <Button size="sm">
+                <Plus />
+                컨택
+              </Button>
+            }
+          />
+        </div>
 
-        {/* 소개경로 — 이 투자사로의 진입 경로(F8) */}
-        <TabsContent value="intro">
-          <div className="space-y-4">
+        {contacts.length === 0 ? (
+          <Card className="items-center justify-center py-12 text-center">
             <p className="text-sm text-muted-foreground">
-              이 투자사로 어떻게 연결됐는지(소개자·관계·일자)를 딜별로 모아
-              봅니다.
+              등록된 컨택이 없습니다.
             </p>
-            {introDeals.length === 0 ? (
-              <Card className="items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  기록된 소개 경로가 없습니다. 딜 생성·수정 시 “소개 경로”를
-                  입력하세요.
-                </p>
-              </Card>
-            ) : (
-              <Card className="p-0">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                      <th className="px-4 py-2.5 font-medium">매물</th>
-                      <th className="px-4 py-2.5 font-medium">소개자</th>
-                      <th className="px-4 py-2.5 font-medium">관계</th>
-                      <th className="px-4 py-2.5 font-medium">일자</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {introDeals.map((deal) => (
-                      <tr
-                        key={deal.id}
-                        className="border-b border-border last:border-0 hover:bg-muted/40"
-                      >
-                        <td className="px-4 py-3">
-                          <Link
-                            href={`/listings/${deal.listing_id}`}
-                            className="font-medium text-foreground hover:text-primary hover:underline"
-                          >
-                            {deal.listing?.company_name ?? "—"}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3">
-                          {deal.intro_source ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {deal.intro_relationship ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDate(deal.intro_date)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
+          </Card>
+        ) : (
+          <Card className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">이름</th>
+                  <th className="px-4 py-2.5 font-medium">직책</th>
+                  <th className="px-4 py-2.5 font-medium">연락처</th>
+                  <th className="px-4 py-2.5 font-medium">최근 컨택</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map((contact) => (
+                  <tr
+                    key={contact.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/40"
+                  >
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5 font-medium">
+                        {contact.is_decision_maker && (
+                          <Star
+                            className="size-3.5 fill-primary text-primary"
+                            aria-label="의사결정권자"
+                          />
+                        )}
+                        {contact.name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {contact.title ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {contact.email ?? contact.phone ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatDate(contact.last_contacted_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
+                        <ContactFormDialog
+                          investorId={investor.id}
+                          contact={contact}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="컨택 수정"
+                            >
+                              <Pencil />
+                            </Button>
+                          }
+                        />
+                        <DeleteDialog
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="컨택 삭제"
+                            >
+                              <Trash2 />
+                            </Button>
+                          }
+                          title="컨택을 삭제할까요?"
+                          description={`'${contact.name}' 컨택을 삭제합니다.`}
+                          action={deleteContact.bind(
+                            null,
+                            contact.id,
+                            investor.id,
+                          )}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </section>
 
-        {/* 활동 — 컨택 이력 타임라인(F5) */}
-        <TabsContent value="activity">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                활동 타임라인
-              </h2>
-              <ActivityFormDialog
-                investorId={investor.id}
-                contacts={activityContacts}
-                deals={activityDeals}
-                trigger={
-                  <Button size="sm">
-                    <Plus />
-                    활동 기록
-                  </Button>
-                }
-              />
-            </div>
-            <ActivityTimeline
-              activities={activities}
-              investorId={investor.id}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+      {/* 연결된 딜 */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">
+            연결된 딜{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              (매물 × 이 투자사)
+            </span>
+          </h2>
+          <DealFormDialog
+            {...dealDialogProps}
+            trigger={
+              <Button size="sm">
+                <Plus />딜
+              </Button>
+            }
+          />
+        </div>
+
+        {deals.length === 0 ? (
+          <Card className="items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">
+              연결된 딜이 없습니다. 매물을 골라 첫 딜을 만들어 보세요.
+            </p>
+          </Card>
+        ) : (
+          <Card className="p-0">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">매물</th>
+                  <th className="px-4 py-2.5 font-medium">단계</th>
+                  <th className="px-4 py-2.5 font-medium">담당</th>
+                  <th className="px-4 py-2.5 font-medium">예상금액</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {deals.map((deal) => (
+                  <tr
+                    key={deal.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/40"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/listings/${deal.listing_id}`}
+                        className="font-medium text-foreground hover:text-primary hover:underline"
+                      >
+                        {deal.listing?.company_name ?? "—"}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={DEAL_STAGE_VARIANT[deal.stage]}>
+                        {deal.stage}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {deal.owner?.name ?? deal.owner?.email ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatKRW(deal.expected_amount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
+                        <DealFormDialog
+                          {...dealDialogProps}
+                          deal={deal}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="딜 수정"
+                            >
+                              <Pencil />
+                            </Button>
+                          }
+                        />
+                        <DeleteDialog
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="딜 삭제"
+                            >
+                              <Trash2 />
+                            </Button>
+                          }
+                          title="딜을 삭제할까요?"
+                          description={`'${deal.listing?.company_name ?? ""}' 딜을 삭제합니다.`}
+                          action={deleteDeal.bind(null, deal.id, undefined)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </section>
+
+      {/* 활동 */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">
+            활동 타임라인{" "}
+            <span className="text-sm font-normal text-muted-foreground">
+              ({activities.length})
+            </span>
+          </h2>
+          <ActivityFormDialog
+            investorId={investor.id}
+            contacts={activityContacts}
+            deals={activityDeals}
+            trigger={
+              <Button size="sm">
+                <Plus />
+                활동 기록
+              </Button>
+            }
+          />
+        </div>
+        <ActivityTimeline activities={activities} investorId={investor.id} />
+      </section>
     </div>
   );
 }

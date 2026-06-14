@@ -4,26 +4,28 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, Trash2 } from "lucide-react";
 
-import type { InvestorWithOwner } from "@/lib/types";
-import { formatDate } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
+import { formatKRW } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DeleteDialog } from "@/components/app/delete-dialog";
 import { deleteInvestor } from "../actions";
 
-export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
+export type InvestorRow = {
+  id: string;
+  name: string;
+  fundCount: number; // 운영 중인 조합 수
+  aumSum: number; // 조합 결성총액 합(원)
+  dealCount: number; // 매칭된 딜 수(매물 × 이 투자사)
+};
+
+export function InvestorTable({ rows }: { rows: InvestorRow[] }) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((inv) =>
-      [inv.name, inv.type, inv.owner?.name, inv.owner?.email]
-        .filter(Boolean)
-        .some((v) => (v as string).toLowerCase().includes(q)),
-    );
+    return rows.filter((inv) => inv.name.toLowerCase().includes(q));
   }, [rows, query]);
 
   return (
@@ -33,7 +35,7 @@ export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="투자사명·유형·담당으로 검색…"
+          placeholder="투자사명으로 검색…"
           className="pl-9"
         />
       </div>
@@ -43,9 +45,9 @@ export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="px-4 py-2.5 font-medium">투자사명</th>
-              <th className="px-4 py-2.5 font-medium">유형</th>
-              <th className="px-4 py-2.5 font-medium">담당</th>
-              <th className="px-4 py-2.5 font-medium">등록일</th>
+              <th className="px-4 py-2.5 font-medium">매칭 딜</th>
+              <th className="px-4 py-2.5 font-medium">조합 수</th>
+              <th className="px-4 py-2.5 font-medium">결성총액 합</th>
               <th className="w-12 px-4 py-2.5">
                 <span className="sr-only">삭제</span>
               </th>
@@ -75,18 +77,20 @@ export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
                       {inv.name}
                     </Link>
                   </td>
-                  <td className="px-4 py-3">
-                    {inv.type ? (
-                      <Badge variant="outline">{inv.type}</Badge>
+                  <td className="px-4 py-3 tabular-nums">
+                    {inv.dealCount > 0 ? (
+                      <span className="font-medium text-foreground">
+                        {inv.dealCount}건
+                      </span>
                     ) : (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">0건</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {inv.owner?.name ?? inv.owner?.email ?? "—"}
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                    {inv.fundCount}개
                   </td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                    {inv.created_at ? formatDate(inv.created_at) : "—"}
+                    {inv.aumSum > 0 ? formatKRW(inv.aumSum) : "—"}
                   </td>
                   <td className="px-2 py-3 text-right">
                     <DeleteDialog
