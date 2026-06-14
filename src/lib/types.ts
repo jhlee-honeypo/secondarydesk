@@ -63,6 +63,7 @@ export type Investor = {
   description: string | null;
   met_date: string | null;
   owner_id: string | null;
+  diva_oper_inst_id: string | null; // DIVA 운용사ID — 임포트 식별 키
   created_at: string;
   updated_at: string;
 };
@@ -82,6 +83,7 @@ export type Fund = {
   check_size_max: number | null;
   secondary_appetite: SecondaryAppetite | null;
   notes: string | null;
+  diva_asct_id: string | null; // DIVA 조합ID — 임포트 멱등 키
   created_at: string;
   updated_at: string;
 };

@@ -23,6 +23,14 @@ export default function ImportPage() {
       </div>
 
       <ImportWizard />
+
+      <p className="text-sm text-muted-foreground">
+        벤처캐피탈협회 전자공시(DIVA) 조합 목록을 가져오려면{" "}
+        <Link href="/import/funds" className="text-primary hover:underline">
+          DIVA 조합 가져오기
+        </Link>
+        를 이용하세요.
+      </p>
     </div>
   );
 }
