@@ -15,7 +15,7 @@ export default async function InvestorsPage() {
   const { data: investors } = await supabase
     .from("investors")
     .select("*, owner:users(name, email)")
-    .order("name");
+    .order("created_at", { ascending: false });
 
   const rows = (investors ?? []) as InvestorWithOwner[];
 

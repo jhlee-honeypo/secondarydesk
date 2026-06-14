@@ -690,6 +690,23 @@ export function DealFormDialog({
             )}
           </div>
 
+          {/* 드랍 사유 — 단계가 '드랍'일 때만(생성·수정 공통). 다른 단계엔 메모 칸
+              없음(개요·성향 메모는 투자사 정보에 별도). lost_reason 컬럼에 저장. */}
+          {stage === "드랍" && (
+            <Field
+              label="드랍 사유"
+              htmlFor="lost_reason"
+              hint="이 딜을 드랍한 이유를 기록합니다."
+            >
+              <Textarea
+                id="lost_reason"
+                name="lost_reason"
+                defaultValue={deal?.lost_reason ?? ""}
+                placeholder="예: 펀드 부적합(시리즈 C 이상 선호), 농식품 비선호 등"
+              />
+            </Field>
+          )}
+
           {!isEdit && (
             <p className="text-xs text-muted-foreground">
               담당 심사역은 딜 생성자(나)로 지정됩니다. 투자사 상세 정보는 생성 후
@@ -698,16 +715,6 @@ export function DealFormDialog({
           )}
 
           {isEdit && <StageHistoryEditor dealId={deal!.id} />}
-
-          {isEdit && (
-            <Field label="메모" htmlFor="lost_reason">
-              <Textarea
-                id="lost_reason"
-                name="lost_reason"
-                defaultValue={deal?.lost_reason ?? ""}
-              />
-            </Field>
-          )}
 
           {state && !state.ok && (
             <p className="text-sm text-destructive" role="alert">

@@ -80,6 +80,23 @@ const STAGE_STYLE: Record<
   },
 };
 
+// 현재 단계에 진입한 일자 — 현재 단계와 같은 단계 이력 중 가장 최근 changed_at.
+// 이력이 없으면 빈 문자열(정렬 시 맨 아래로). 카드 정렬·기업소개 경과 판정에 쓴다.
+function currentStageDate(deal: DealCard): string {
+  let latest = "";
+  for (const ev of deal.stage_events ?? []) {
+    if (ev.stage === deal.stage && ev.changed_at > latest) latest = ev.changed_at;
+  }
+  return latest;
+}
+
+// todayStr(YYYY-MM-DD) 기준 n개월 전 날짜(YYYY-MM-DD).
+function monthsAgo(todayStr: string, n: number): string {
+  const d = new Date(todayStr);
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 10);
+}
+
 type SavedView = { name: string; listing: string; owner: string; fund?: string };
 
 export function DealBoard({
@@ -430,6 +447,13 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const style = STAGE_STYLE[stage];
 
+  // 현재 단계 진입일 기준 정렬 — 최신 일정이 위로, 오래된 일정이 아래로.
+  const ordered = [...deals].sort((a, b) => {
+    const da = currentStageDate(a);
+    const db = currentStageDate(b);
+    return da > db ? -1 : da < db ? 1 : 0;
+  });
+
   return (
     <div
       ref={setNodeRef}
@@ -452,7 +476,7 @@ function Column({
         </span>
       </div>
       <div className="flex min-h-24 flex-1 flex-col gap-2">
-        {deals.map((deal) => (
+        {ordered.map((deal) => (
           <DraggableCard
             key={deal.id}
             deal={deal}
@@ -559,11 +583,23 @@ function DealCardView({
     a.changed_at < b.changed_at ? -1 : a.changed_at > b.changed_at ? 1 : 0,
   );
 
+  // 기업소개 단계에서 현재 단계 진입일이 2개월 넘게 지난 딜 — 사실상 드랍으로
+  // 보고 음영 처리(기업소개에만 적용). 진입일 이력이 없으면 판정하지 않음.
+  const introStageDate = currentStageDate(deal).slice(0, 10);
+  const staleIntro =
+    deal.stage === "기업소개" &&
+    introStageDate !== "" &&
+    introStageDate < monthsAgo(todayStr, 2);
+
   return (
     <div
+      title={
+        staleIntro ? "기업소개 2개월 경과 — 사실상 드랍 검토" : undefined
+      }
       className={cn(
         "group relative rounded-lg border border-border bg-card text-sm shadow-xs",
         dragging && "cursor-grabbing shadow-md",
+        staleIntro && "border-dashed bg-muted/70 opacity-90",
       )}
     >
       {/* 단계 색상 좌측 바 — 컬럼 음영과 함께 단계 구분을 보강 */}

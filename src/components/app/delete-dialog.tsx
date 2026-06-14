@@ -31,10 +31,27 @@ export function DeleteDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  function handleDelete() {
+    if (pending) return;
+    startTransition(async () => {
+      await action();
+      setOpen(false);
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        // Enter = 삭제(확인). 기본 포커스가 '취소'라 Enter 시 닫히던 동작을 덮는다.
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleDelete();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -49,12 +66,7 @@ export function DeleteDialog({
             type="button"
             variant="destructive"
             disabled={pending}
-            onClick={() =>
-              startTransition(async () => {
-                await action();
-                setOpen(false);
-              })
-            }
+            onClick={handleDelete}
           >
             {pending ? "삭제 중…" : "삭제"}
           </Button>

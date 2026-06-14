@@ -1,10 +1,22 @@
 import Link from "next/link";
 
+import { createClient } from "@/lib/supabase/server";
+import { listListingBundles } from "../actions";
 import { DealImport } from "./_components/deal-import";
 
 export const dynamic = "force-dynamic";
 
-export default function DealImportPage() {
+export default async function DealImportPage() {
+  const supabase = await createClient();
+  const [bundles, listingsRes] = await Promise.all([
+    listListingBundles(),
+    supabase.from("listings").select("id, company_name"),
+  ]);
+  const listings = (listingsRes.data ?? []) as {
+    id: string;
+    company_name: string;
+  }[];
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <Link
@@ -26,7 +38,7 @@ export default function DealImportPage() {
         </p>
       </div>
 
-      <DealImport />
+      <DealImport bundles={bundles} listings={listings} />
     </div>
   );
 }

@@ -198,6 +198,7 @@ export async function createDeal(
     expected_amount: num(fd, "expected_amount"),
     next_action: text(fd, "next_action"),
     next_action_date: text(fd, "next_action_date"),
+    lost_reason: text(fd, "lost_reason"), // 드랍 단계일 때만 폼에 존재(아니면 null)
   };
 
   // 이미 이 투자사에 딜이 있는 매물은 제외(unique(listing_id, investor_id) 충돌 방지)
@@ -519,12 +520,16 @@ export async function updateDeal(
 
   const supabase = await createClient();
 
-  // 1) 딜 본체(단계·메모). 대상 조합/담당은 수정 폼에서 제거되어 건드리지 않는다.
+  // 1) 딜 본체(단계). 대상 조합/담당은 수정 폼에서 제거되어 건드리지 않는다.
+  // 드랍 사유 칸은 단계가 '드랍'일 때만 폼에 있다. 필드가 제출됐을 때만 저장하고,
+  // 없으면(드랍 외 단계) 기존 lost_reason 을 보존한다 — 단계를 바꿔도 사유 유지.
   const stageInput = text(fd, "stage");
-  const dealPayload = {
+  const dealPayload: { stage?: DealStage; lost_reason?: string | null } = {
     stage: isStage(stageInput) ? stageInput : undefined,
-    lost_reason: text(fd, "lost_reason"),
   };
+  if (fd.has("lost_reason")) {
+    dealPayload.lost_reason = text(fd, "lost_reason");
+  }
   const { data: dealRow, error: dealErr } = await supabase
     .from("deals")
     .update(dealPayload)
@@ -630,36 +635,41 @@ export async function getDealStageEvents(
   return { ok: true, events: (data ?? []) as StageEventRow[] };
 }
 
+// 이력 수정(단계/일자) + 남은 이력의 최신 단계로 딜 단계 자동 동기화. 단계나 일자를
+// 바꾸면 "가장 최근 이력"이 달라질 수 있어, 삭제와 동일하게 RPC 한 트랜잭션에서
+// 트리거 이력 생성 없이 처리한다(마이그레이션 20260614000000).
 export async function updateStageEvent(
   eventId: string,
   patch: { stage?: DealStage; changed_at?: string },
 ): Promise<ActionResult> {
   if (!eventId) return { ok: false, error: "잘못된 요청입니다." };
 
-  const upd: { stage?: DealStage; changed_at?: string } = {};
-  if (patch.stage && isStage(patch.stage)) upd.stage = patch.stage;
-  if (patch.changed_at) upd.changed_at = patch.changed_at;
-  if (Object.keys(upd).length === 0) return { ok: true };
+  const args: { p_event_id: string; p_stage?: DealStage; p_changed_at?: string } =
+    { p_event_id: eventId };
+  if (patch.stage && isStage(patch.stage)) args.p_stage = patch.stage;
+  if (patch.changed_at) args.p_changed_at = patch.changed_at;
+  if (args.p_stage === undefined && args.p_changed_at === undefined) {
+    return { ok: true };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("deal_stage_events")
-    .update(upd)
-    .eq("id", eventId);
+  const { error } = await supabase.rpc("update_stage_event_resync", args);
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/deals");
   return { ok: true };
 }
 
+// 이력 삭제 + 남은 이력의 최신 단계로 딜 단계 자동 동기화(예: IR 이력을 지우면
+// 카드가 기업소개로 내려옴). 트리거가 새 이력을 만들지 않도록 DB 함수(RPC) 안에서
+// 한 트랜잭션으로 처리한다(마이그레이션 20260614000000).
 export async function deleteStageEvent(eventId: string): Promise<ActionResult> {
   if (!eventId) return { ok: false, error: "잘못된 요청입니다." };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("deal_stage_events")
-    .delete()
-    .eq("id", eventId);
+  const { error } = await supabase.rpc("delete_stage_event_resync", {
+    p_event_id: eventId,
+  });
 
   if (error) return { ok: false, error: error.message };
   revalidatePath("/deals");

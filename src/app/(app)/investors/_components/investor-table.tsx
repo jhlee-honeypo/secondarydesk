@@ -2,12 +2,16 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 
 import type { InvestorWithOwner } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DeleteDialog } from "@/components/app/delete-dialog";
+import { deleteInvestor } from "../actions";
 
 export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
   const [query, setQuery] = useState("");
@@ -41,13 +45,17 @@ export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
               <th className="px-4 py-2.5 font-medium">투자사명</th>
               <th className="px-4 py-2.5 font-medium">유형</th>
               <th className="px-4 py-2.5 font-medium">담당</th>
+              <th className="px-4 py-2.5 font-medium">등록일</th>
+              <th className="w-12 px-4 py-2.5">
+                <span className="sr-only">삭제</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={3}
+                  colSpan={5}
                   className="px-4 py-10 text-center text-sm text-muted-foreground"
                 >
                   “{query}”에 해당하는 투자사가 없습니다.
@@ -76,6 +84,25 @@ export function InvestorTable({ rows }: { rows: InvestorWithOwner[] }) {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {inv.owner?.name ?? inv.owner?.email ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                    {inv.created_at ? formatDate(inv.created_at) : "—"}
+                  </td>
+                  <td className="px-2 py-3 text-right">
+                    <DeleteDialog
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`${inv.name} 삭제`}
+                        >
+                          <Trash2 />
+                        </Button>
+                      }
+                      title="투자사를 삭제할까요?"
+                      description={`'${inv.name}'와 소속 조합·컨택·딜·활동이 모두 함께 삭제됩니다. 되돌릴 수 없습니다.`}
+                      action={deleteInvestor.bind(null, inv.id)}
+                    />
                   </td>
                 </tr>
               ))

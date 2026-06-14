@@ -44,6 +44,14 @@ export type ImportWizardConfig = {
   run: (rows: Record<string, string>[]) => Promise<ImportRunResult>;
   /** 성공 요약 렌더러 */
   renderSummary: (result: { ok: true } & Record<string, unknown>) => ReactNode;
+  /**
+   * 행 수가 아닌 '실제 처리될 수'를 추정해 버튼·미리보기에 표시(예: 즐겨찾기 묶음
+   * 펼침으로 한 행 → 여러 딜). 없으면 행 수를 그대로 쓴다. approx=true 면 "최대"로
+   * 표기(중복 제거 등으로 실제는 더 적을 수 있음).
+   */
+  estimate?: (
+    rows: Record<string, string>[],
+  ) => { count: number; approx?: boolean };
 };
 
 /**
@@ -160,6 +168,9 @@ export function ImportWizard(cfg: ImportWizardConfig) {
   const importable = rows.filter(
     (r) => (r[cfg.requiredKey] ?? "").trim() !== "",
   ).length;
+  // 펼침 추정(있으면) — 버튼·미리보기에 실제 처리 수를 보여준다.
+  const est = cfg.estimate && parsed ? cfg.estimate(rows) : null;
+  const effectiveCount = est ? est.count : importable;
 
   function handleImport() {
     setResult(null);
@@ -315,16 +326,24 @@ export function ImportWizard(cfg: ImportWizardConfig) {
             <div className="flex items-center gap-3">
               <Button
                 type="button"
-                disabled={!requiredMapped || importable === 0 || pending}
+                disabled={!requiredMapped || effectiveCount === 0 || pending}
                 onClick={handleImport}
               >
                 {pending
                   ? "가져오는 중…"
-                  : `${importable}개 ${cfg.unit} 가져오기`}
+                  : `${est?.approx ? "최대 " : ""}${effectiveCount}개 ${cfg.unit} 가져오기`}
               </Button>
-              {importable === 0 && requiredMapped && (
+              {requiredMapped && importable === 0 && (
                 <span className="text-sm text-muted-foreground">
                   {requiredLabel}이(가) 채워진 행이 없습니다.
+                </span>
+              )}
+              {requiredMapped && importable > 0 && est && (
+                <span className="text-sm text-muted-foreground">
+                  {importable}개 행 → 펼친 {cfg.unit} {est.approx ? "최대 " : ""}
+                  {est.count}개
+                  {est.count === 0 &&
+                    " — 매물·묶음이 매칭되지 않았습니다(매핑을 확인하세요)"}
                 </span>
               )}
             </div>
