@@ -17,8 +17,6 @@ import { DEAL_STAGES, DEAL_STAGE_VARIANT } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const dynamic = "force-static";
-
 type GuideSection = {
   icon: LucideIcon;
   title: string;
