@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -26,10 +27,11 @@ import {
 } from "@/components/ui/select";
 import {
   LISTING_STATUS_LABEL,
+  LISTING_STATUS_VARIANT,
   SECTOR_OPTIONS,
-  SELECTABLE_LISTING_STATUSES,
   type HoldingFund,
   type Listing,
+  type ListingStatus,
 } from "@/lib/types";
 import { Field } from "@/components/app/field";
 import { fundLabel } from "@/lib/format";
@@ -239,38 +241,44 @@ export function ListingFormDialog({
             </Field>
           </div>
 
+          {/* 상태는 sparkERP(slab)와 일치시키기 위해 항상 읽기 전용. 섹터는 slab
+              매칭(bubbleCompanyId) 매물이면 읽기 전용, 미매칭 신규 매물이면 slab
+              택소노미(SECTOR_OPTIONS)에서 선택. 값은 hidden/Select 로 제출된다. */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="상태">
-              <Select name="status" value={status} onValueChange={setStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SELECTABLE_LISTING_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {LISTING_STATUS_LABEL[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <input type="hidden" name="status" value={status} />
+              <div className="flex h-9 items-center">
+                <Badge variant={LISTING_STATUS_VARIANT[status as ListingStatus]}>
+                  {LISTING_STATUS_LABEL[status as ListingStatus]}
+                </Badge>
+              </div>
             </Field>
             <Field label="섹터">
-              <Select
-                name="sector"
-                value={sector || undefined}
-                onValueChange={setSector}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECTOR_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {bubbleCompanyId ? (
+                <>
+                  <input type="hidden" name="sector" value={sector} />
+                  <div className="flex h-9 items-center text-sm text-muted-foreground">
+                    {sector || "—"}
+                  </div>
+                </>
+              ) : (
+                <Select
+                  name="sector"
+                  value={sector || undefined}
+                  onValueChange={setSector}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTOR_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </Field>
           </div>
 

@@ -77,8 +77,8 @@ export type BubbleCompany = {
   id: string;
   nameKr: string;
   nameEn: string | null;
-  sector: string | null; // 우리 SECTOR_OPTIONS 로 best-effort 매핑된 값
-  sectorRaw: string | null; // Bubble 원문(참고 표시용)
+  sector: string | null; // slab 섹터 원문(SECTOR_OPTIONS 와 동일 택소노미) → listing.sector
+  sectorRaw: string | null; // Bubble 원문(참고 표시용, sector 와 동일)
   lastRoundType: string | null; // → listing.stage
   sharePrice: number | null; // → listing.latest_round_price
   status: string; // → listing.status (LIVE/EXIT/W/O)
@@ -118,49 +118,6 @@ function normFund(r: Record<string, unknown>): BubbleFund {
     startDate: str(r["fund start date"]),
     endDate: str(r["fund end date"]),
   };
-}
-
-// Bubble 영문 섹터 → 우리 SECTOR_OPTIONS(한국어) best-effort 매핑.
-// 토큰 단위로 분해해 매칭(부분문자열 매칭 시 "entertainment"에 "ai"가 잡히는 등
-// 오탐 발생). 매칭 실패 시 null(폼에서 사용자가 직접 선택).
-function mapSector(raw: string | null): string | null {
-  if (!raw) return null;
-  const tokens = raw.toLowerCase().split(/[^a-z0-9가-힣]+/).filter(Boolean);
-  // 토큰이 키워드를 포함하면 매칭(긴 키워드는 부분일치 허용, 짧은 건 토큰 동등).
-  const tokHas = (...keys: string[]) =>
-    keys.some((k) =>
-      tokens.some((t) => (k.length <= 3 ? t === k : t.includes(k))),
-    );
-  // 콘텐츠/스포츠가 함께 오는 "Entertainment/Media/Sports" 같은 복합 카테고리는
-  // 콘텐츠/예술로 우선 매핑(피트니스보다 먼저 확인).
-  if (tokHas("entertainment", "media", "content", "art", "music"))
-    return "콘텐츠/예술";
-  if (tokHas("fintech", "finance", "insurance", "bank")) return "금융/보험/핀테크";
-  if (tokHas("commerce", "ecommerce", "retail")) return "커머스";
-  if (tokHas("health", "healthcare", "bio", "medical", "pharma"))
-    return "헬스케어/바이오";
-  if (tokHas("ai", "artificial", "deeptech", "blockchain", "crypto"))
-    return "AI/딥테크/블록체인";
-  if (tokHas("education", "edtech", "edu")) return "교육";
-  if (tokHas("game", "gaming")) return "게임";
-  if (tokHas("mobility", "transport", "automotive")) return "모빌리티/교통";
-  if (tokHas("food", "agriculture", "agtech")) return "푸드/농업";
-  if (tokHas("fashion", "apparel")) return "패션";
-  if (tokHas("beauty", "cosmetic")) return "뷰티/화장품";
-  if (tokHas("logistics", "supply")) return "물류";
-  if (tokHas("estate", "construction", "proptech")) return "부동산/건설";
-  if (tokHas("travel", "leisure", "tourism")) return "여행/레저";
-  if (tokHas("energy", "environment", "climate")) return "환경/에너지";
-  if (tokHas("social", "community")) return "소셜미디어/커뮤니티";
-  if (tokHas("manufacturing", "hardware", "robotics")) return "제조/하드웨어";
-  if (tokHas("security", "data", "telecom", "communication"))
-    return "통신/보안/데이터";
-  if (tokHas("legal", "saas", "b2b", "hr")) return "인사/비즈니스/법률";
-  if (tokHas("kids", "baby", "maternity", "parenting")) return "유아/출산";
-  if (tokHas("home", "pet", "living", "furniture")) return "홈리빙/펫";
-  if (tokHas("fitness", "sports", "sport")) return "피트니스/스포츠";
-  if (tokHas("marketing", "advertising")) return "광고/마케팅";
-  return null;
 }
 
 function mapStatus(raw: string | null): string {
@@ -231,7 +188,7 @@ function mapCompanies(
       id: String(r._id ?? ""),
       nameKr: str(r["company name"]) ?? "(이름 없음)",
       nameEn: str(r["company name eng"]),
-      sector: mapSector(sectorRaw),
+      sector: sectorRaw,
       sectorRaw,
       lastRoundType: str(r["last round type"]),
       sharePrice: nnum(r["share price"]),
