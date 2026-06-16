@@ -12,6 +12,7 @@ import {
 import {
   matchFund,
   matchListing,
+  resolveListingStatus,
   runErpSync,
   type ApplyResult,
   type ExistingFund,
@@ -36,6 +37,8 @@ export type SyncPreview = {
       sector: string | null;
       fundNames: string[];
       latestPrice: number | null;
+      currentStatus: string;
+      newStatus: string;
     }[];
     unmatched: { id: string; name: string }[];
     erpUntrackedCount: number;
@@ -69,7 +72,7 @@ export async function getSyncPreview(): Promise<SyncPreview> {
     supabase
       .from("listings")
       .select(
-        "id, company_name, company_name_en, sector, stage, latest_round_price, bubble_id, listing_funds(holding_fund_id)",
+        "id, company_name, company_name_en, sector, stage, latest_round_price, status, bubble_id, listing_funds(holding_fund_id)",
       ),
   ]);
 
@@ -109,6 +112,8 @@ export async function getSyncPreview(): Promise<SyncPreview> {
         fundNames: c.fundNames,
         // 최신 단가는 ERP 값(share price/분기현황)이 양수일 때만 갱신.
         latestPrice: c.sharePrice && c.sharePrice > 0 ? c.sharePrice : null,
+        currentStatus: lst.status,
+        newStatus: resolveListingStatus(lst.status, c.status),
       });
     } else {
       listingUnmatched.push({ id: lst.id, name: lst.company_name });

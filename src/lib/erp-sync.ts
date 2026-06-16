@@ -45,9 +45,17 @@ export type ExistingListing = {
   sector: string | null;
   stage: string | null;
   latest_round_price: number | null;
+  status: string;
   bubble_id: string | null;
   listing_funds: { holding_fund_id: string }[];
 };
+
+// ERP 회사 투자상태(LIVE/EXIT/W/O)를 매물 상태로 반영하되, 수동 영업값인
+// "ON SALE"(매각 진행 중)은 보존한다. c.status 는 bubble.mapStatus 로 이미
+// LIVE/EXIT/W/O 로 매핑된 값.
+export function resolveListingStatus(current: string, erpStatus: string): string {
+  return current === "ON SALE" ? current : erpStatus;
+}
 
 // ERP fund ↔ 기존 holding_funds 매칭. ERP 펀드명은 약칭(예: SKF3)이고
 // SecondaryDesk 는 상세 명칭이라, bubble_id → 약칭(short_name) → 상세명 순으로 매칭.
@@ -157,21 +165,27 @@ export async function runErpSync(supabase: SyncClient): Promise<ApplyResult> {
   const { data: listingRows, error: lstReadErr } = await supabase
     .from("listings")
     .select(
-      "id, company_name, company_name_en, sector, stage, latest_round_price, bubble_id, listing_funds(holding_fund_id)",
+      "id, company_name, company_name_en, sector, stage, latest_round_price, status, bubble_id, listing_funds(holding_fund_id)",
     );
   if (lstReadErr) return { ok: false, error: lstReadErr.message };
   const existingListings = (listingRows ?? []) as ExistingListing[];
 
   let listingsUpdated = 0;
   let fundLinksAdded = 0;
-  // 한 ERP 회사가 둘 이상의 기존 매물에 매칭되면(중복 매물) bubble_id 유니크
-  // 인덱스 위반이 나므로, 이미 배정된 회사는 건너뛴다(첫 매물에만 연결).
-  const assignedCompanyIds = new Set<string>();
+  // bubble_id 는 UNIQUE 라 한 ERP 회사는 매물 1건에만 연결돼야 한다.
+  // 어떤 매물이 이미 그 회사를 소유 중인지 DB 상태로 먼저 파악(ownerByCompany).
+  // 이름으로 매칭됐더라도 그 회사가 다른 매물 소유면 건너뛴다(유니크 위반 방지).
+  // 처리 순서와 무관하게 안전하다.
+  const ownerByCompany = new Map<string, string>();
+  for (const l of existingListings) {
+    if (l.bubble_id) ownerByCompany.set(l.bubble_id, l.id);
+  }
   for (const lst of existingListings) {
     const c = matchListing(lst, erpCompanies);
     if (!c) continue;
-    if (assignedCompanyIds.has(c.id)) continue;
-    assignedCompanyIds.add(c.id);
+    const owner = ownerByCompany.get(c.id);
+    if (owner && owner !== lst.id) continue; // 다른 매물이 이미 이 회사 소유
+    ownerByCompany.set(c.id, lst.id); // 소유 확정(이후 매물이 같은 회사 매칭 시 차단)
 
     // ERP 사실만 덮고, 비어있지 않으면 보존(영업상태·자료링크는 애초에 안 건드림).
     const fields = {
@@ -183,6 +197,8 @@ export async function runErpSync(supabase: SyncClient): Promise<ApplyResult> {
         c.sharePrice && c.sharePrice > 0
           ? c.sharePrice
           : lst.latest_round_price,
+      // ERP 투자상태를 반영(LIVE/EXIT/W/O), 단 "ON SALE"은 영업값이라 보존.
+      status: resolveListingStatus(lst.status, c.status),
       bubble_id: c.id,
     };
     const { error: updErr } = await supabase

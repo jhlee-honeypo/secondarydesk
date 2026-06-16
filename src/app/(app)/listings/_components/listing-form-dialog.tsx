@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { Database } from "lucide-react";
 
 import {
   Dialog,
@@ -38,7 +39,7 @@ import {
   updateListing,
   type ActionResult,
 } from "../actions";
-import { lookupBubbleCompanies } from "../bubble-actions";
+import { lookupBubbleCompanies, lookupBubbleInvestments } from "../bubble-actions";
 import { BubbleLookup } from "./bubble-lookup";
 import { RoundsEditor, type RoundSeed } from "./rounds-editor";
 
@@ -76,6 +77,42 @@ export function ListingFormDialog({
     isEdit ? null : [],
   );
   const [roundsLoading, setRoundsLoading] = useState(false);
+  // roundsSeed 가 바뀌어도 RoundsEditor 의 내부 state 는 갱신되지 않으므로
+  // (useState 초기값은 최초 1회만 적용) key 를 바꿔 강제 remount 한다.
+  const [roundsKey, setRoundsKey] = useState(0);
+
+  // sparkERP 투자내역 자동채움 — 매칭된 회사 _id(동기화 시 저장) 또는
+  // BubbleLookup 으로 선택한 회사의 _id 를 기준으로 투자 라운드를 불러온다.
+  const [bubbleCompanyId, setBubbleCompanyId] = useState<string | null>(
+    listing?.bubble_id ?? null,
+  );
+  const [invLoading, startInv] = useTransition();
+  const [invMsg, setInvMsg] = useState<string | null>(null);
+
+  function loadInvestments() {
+    if (!bubbleCompanyId) return;
+    setInvMsg(null);
+    startInv(async () => {
+      const seed = await lookupBubbleInvestments(bubbleCompanyId);
+      if (seed.length === 0) {
+        setInvMsg(
+          "sparkERP 투자내역이 없거나 단가를 역산할 수 있는 건이 없습니다.",
+        );
+        return;
+      }
+      // 라운드에 매핑된 운용펀드를 매물에 자동 태깅 — 안 하면 RoundsEditor 가
+      // 소속 펀드 입력(hidden)을 렌더하지 않아 저장 시 holding_fund_id 가 누락된다.
+      const seedFundIds = seed
+        .map((s) => s.holding_fund_id)
+        .filter((id): id is string => Boolean(id));
+      if (seedFundIds.length) {
+        setFundIds((cur) => Array.from(new Set([...cur, ...seedFundIds])));
+      }
+      setRoundsSeed(seed);
+      setRoundsKey((k) => k + 1);
+      setInvMsg(`투자내역 ${seed.length}건을 불러왔습니다. 저장하면 반영됩니다.`);
+    });
+  }
 
   // 소속 운용펀드 태깅(제어형) — 라운드 에디터의 "소속 펀드" 선택지로 전달.
   const [fundIds, setFundIds] = useState<string[]>(selectedFundIds);
@@ -136,6 +173,8 @@ export function ListingFormDialog({
             placeholder="회사명 검색 (국문·영문)"
             search={lookupBubbleCompanies}
             onPick={(c) => {
+              setBubbleCompanyId(c.id);
+              setInvMsg(null);
               setCompanyName(c.nameKr);
               setCompanyNameEn(c.nameEn ?? "");
               setStatus(c.status);
@@ -294,6 +333,27 @@ export function ListingFormDialog({
             )}
           </div>
 
+          {/* sparkERP 투자내역 자동채움 — 라운드별 단가(역산)·주식수 일괄 입력 */}
+          {bubbleCompanyId && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={loadInvestments}
+                disabled={invLoading}
+              >
+                <Database />
+                {invLoading
+                  ? "불러오는 중…"
+                  : "sparkERP 투자내역 불러오기"}
+              </Button>
+              {invMsg && (
+                <span className="text-xs text-muted-foreground">{invMsg}</span>
+              )}
+            </div>
+          )}
+
           {/* 투자 데이터(선택) — EXIT 시나리오 소스 */}
           {isEdit && roundsSeed === null ? (
             <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
@@ -301,6 +361,7 @@ export function ListingFormDialog({
             </div>
           ) : (
             <RoundsEditor
+              key={roundsKey}
               initial={roundsSeed ?? []}
               funds={taggedFunds}
               defaultFundId={defaultFundId}

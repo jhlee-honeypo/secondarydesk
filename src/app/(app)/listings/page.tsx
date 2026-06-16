@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ListingFormDialog } from "./_components/listing-form-dialog";
+import { BulkInvestmentButton } from "./_components/bulk-investment-button";
 import { ListingFilters } from "./_components/listing-filters";
 import { SectorCell, StatusCell } from "./_components/listing-inline-edit";
 
@@ -71,6 +72,7 @@ export default async function ListingsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <BulkInvestmentButton />
           <Button variant="outline" asChild>
             <Link href="/listings/import">
               <FileUp />

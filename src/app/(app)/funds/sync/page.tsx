@@ -55,8 +55,9 @@ export default async function SyncPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             기존 수기 데이터를 지우지 않고, 이름으로 대조해 ERP 정보로 제자리
-            갱신합니다. ERP 사실(영문명·섹터·최신단가·약정액·만기·소속조합)만
-            채우고 영업 상태·자료 링크·메모는 보존합니다.
+            갱신합니다. ERP 사실(영문명·섹터·최신단가·약정액·만기·소속조합·투자상태
+            LIVE/EXIT/W/O)을 채우고, 자료 링크·메모와 영업값 ON SALE 상태는
+            보존합니다.
           </p>
         </div>
       </div>
@@ -162,6 +163,11 @@ export default async function SyncPage() {
                             ? ` · 조합 ${l.fundNames.join(", ")}`
                             : ""}
                         </span>
+                        {l.currentStatus !== l.newStatus && (
+                          <Badge variant="outline" className="text-xs">
+                            상태 {l.currentStatus} → {l.newStatus}
+                          </Badge>
+                        )}
                       </li>
                     ))}
                   </ul>

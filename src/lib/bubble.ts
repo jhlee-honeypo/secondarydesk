@@ -314,6 +314,207 @@ export async function getAllBubbleFunds(): Promise<BubbleFund[]> {
   return rows.map(normFund).filter((f) => f.id);
 }
 
+// ---- 우리(스파크랩) 투자내역 (EXIT 시나리오 자동채움 소스) -----------------
+
+export type BubbleInvestment = {
+  company: string; // sparkERP company _id (매물 매칭용)
+  fundId: string | null; // sparkERP fund _id (운용펀드 매칭용)
+  amount: number; // 투자금액(원) = total amount
+  shares: number; // 보유 주식수 = share
+  unitPrice: number; // 투자 단가 = amount ÷ shares (역산, 정수 반올림)
+  status: string | null; // investment status (Live / Written-off 등)
+};
+
+function normInvestment(r: Record<string, unknown>): BubbleInvestment {
+  const amount = nnum(r["total amount"]) ?? 0;
+  const shares = nnum(r["share"]) ?? 0;
+  return {
+    company: str(r["company"]) ?? "",
+    fundId: str(r["fund"]),
+    amount,
+    shares,
+    unitPrice: shares > 0 ? Math.round(amount / shares) : 0,
+    status: str(r["investment status"]),
+  };
+}
+
+/** 특정 포트폴리오 회사(company _id)에 대한 우리 투자내역(sparklabinvestment).
+ *  한 건이 한 라운드(투자 회차)에 대응. 단가는 total amount ÷ share 로 역산하며
+ *  share 가 없으면 단가 0(자동채움 단계에서 거른다). */
+export async function getBubbleInvestmentsByCompany(
+  companyId: string,
+): Promise<BubbleInvestment[]> {
+  if (!companyId) return [];
+  const rows = await fetchAll("sparklabinvestment");
+  return rows.map(normInvestment).filter((x) => x.company === companyId);
+}
+
+/** ERP 전체 투자내역(일괄 자동채움 소스). */
+export async function getAllBubbleInvestments(): Promise<BubbleInvestment[]> {
+  const rows = await fetchAll("sparklabinvestment");
+  return rows.map(normInvestment).filter((x) => x.company);
+}
+
+// ---- 매물 상세 ERP 개요(주식정보·스파크랩 투자·후속투자) --------------------
+// 회사 1건 분량이라 전체 fetch 대신 Bubble constraints(서버측 정확일치 필터)로
+// 해당 회사 레코드만 받아 빠르게 조회한다.
+
+async function fetchByField(
+  type: string,
+  key: string,
+  value: string,
+): Promise<Record<string, unknown>[]> {
+  const params = new URLSearchParams();
+  params.set(
+    "constraints",
+    JSON.stringify([{ key, constraint_type: "equals", value }]),
+  );
+  params.set("limit", "100");
+  const url = `${BASE}/api/1.1/obj/${type}?${params.toString()}`;
+  const headers: Record<string, string> = {};
+  if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
+  const res = await fetch(url, { headers, cache: "no-store" });
+  if (!res.ok) throw new Error(`Bubble ${type} ${res.status}`);
+  const json = (await res.json()) as BubbleListResponse;
+  return json.response?.results ?? [];
+}
+
+export type ErpStockInfo = {
+  valuation: number | null; // 기업가치 = 주당가격 × 발행주식총수
+  lastRoundType: string | null; // 마지막 투자라운드
+  lastInvestDate: string | null; // 마지막 투자유치일(ISO)
+  sharesOutstanding: number | null; // 발행주식총수
+  sharePrice: number | null; // 주당가격
+  shareCurrency: string | null;
+  investmentStatus: string | null;
+};
+
+export type ErpInvestment = {
+  fundId: string | null; // sparkERP fund _id
+  amount: number; // 투자금액(원)
+  shares: number; // 보유 주식수
+  unitPrice: number; // 단가(역산)
+  shareRatio: number | null; // 지분율(%)
+  status: string | null; // Live / Written-off 등
+};
+
+export type ErpFundingRound = {
+  year: number | null;
+  quarter: string | null;
+  series: string | null; // funding series
+  amountRaised: number | null; // total amount raised
+  sharePrice: number | null;
+  issuedShares: number | null;
+  endDate: string | null; // funding end date(ISO)
+};
+
+export type ErpCompanyOverview = {
+  found: boolean;
+  stock: ErpStockInfo;
+  investments: ErpInvestment[];
+  fundingRounds: ErpFundingRound[];
+};
+
+const EMPTY_OVERVIEW: ErpCompanyOverview = {
+  found: false,
+  stock: {
+    valuation: null,
+    lastRoundType: null,
+    lastInvestDate: null,
+    sharesOutstanding: null,
+    sharePrice: null,
+    shareCurrency: null,
+    investmentStatus: null,
+  },
+  investments: [],
+  fundingRounds: [],
+};
+
+/** 매물 상세용 — sparkERP 회사(_id)의 주식정보·스파크랩 투자·후속투자 묶음. */
+export async function getErpCompanyOverview(
+  companyId: string,
+): Promise<ErpCompanyOverview> {
+  if (!companyId) return EMPTY_OVERVIEW;
+
+  const [companyRows, quarterRows, invRows] = await Promise.all([
+    fetchByField("company", "_id", companyId),
+    fetchByField("quarterlyupdate", "company", companyId),
+    fetchByField("sparklabinvestment", "company", companyId),
+  ]);
+
+  const company = companyRows[0];
+  if (!company) return EMPTY_OVERVIEW;
+
+  // 분기현황을 최신순 정렬(연도 desc, 분기 desc)
+  const quarters = [...quarterRows].sort((a, b) => {
+    const yb = (nnum(b["year"]) ?? 0) - (nnum(a["year"]) ?? 0);
+    if (yb !== 0) return yb;
+    return (
+      (QUARTER_ORD[String(b["quarter"])] ?? 0) -
+      (QUARTER_ORD[String(a["quarter"])] ?? 0)
+    );
+  });
+  // 최신 분기부터 첫 양수값을 채택(분기마다 일부 필드만 채워짐).
+  const latest = (key: string): number | null => {
+    for (const q of quarters) {
+      const v = nnum(q[key]);
+      if (v && v > 0) return v;
+    }
+    return null;
+  };
+
+  const sharePrice = latest("latest share price") ?? nnum(company["share price"]);
+  const sharesOutstanding =
+    latest("latest issued share outstanding") ??
+    nnum(company["share outstanding"]);
+  const valuation =
+    sharePrice && sharesOutstanding ? sharePrice * sharesOutstanding : null;
+
+  const fundingRounds: ErpFundingRound[] = quarters
+    .filter(
+      (q) =>
+        String(q["any new funding round?"] ?? "").toLowerCase() === "done" ||
+        str(q["funding series"]) ||
+        nnum(q["total amount raised"]),
+    )
+    .map((q) => ({
+      year: nnum(q["year"]),
+      quarter: str(q["quarter"]),
+      series: str(q["funding series"]),
+      amountRaised: nnum(q["total amount raised"]),
+      sharePrice: nnum(q["share price"]),
+      issuedShares: nnum(q["issued share outstanding"]),
+      endDate: str(q["funding end date"]),
+    }));
+
+  const investments: ErpInvestment[] = invRows.map((r) => {
+    const inv = normInvestment(r);
+    return {
+      fundId: inv.fundId,
+      amount: inv.amount,
+      shares: inv.shares,
+      unitPrice: inv.unitPrice,
+      shareRatio: nnum(r["share ratio"]),
+      status: inv.status,
+    };
+  });
+
+  return {
+    found: true,
+    stock: {
+      valuation,
+      lastRoundType: str(company["last round type"]),
+      lastInvestDate: str(company["last invest date"]),
+      sharesOutstanding,
+      sharePrice,
+      shareCurrency: str(company["share currency"]),
+      investmentStatus: str(company["company investment status"]),
+    },
+    investments,
+    fundingRounds,
+  };
+}
+
 /** 조합 현황 화면용 — 전체 조합 + 각 조합이 보유한 포트폴리오 회사. */
 export async function getErpFundsWithPortfolio(): Promise<
   ErpFundWithPortfolio[]
