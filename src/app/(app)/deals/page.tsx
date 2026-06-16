@@ -7,29 +7,18 @@ import { listListingBundles } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function DealsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ closed?: string }>;
-}) {
+export default async function DealsPage() {
   const supabase = await createClient();
   const me = await getCurrentUser();
-  const { closed } = await searchParams;
-  const showClosed = closed === "1";
 
   // 카드·수정폼이 실제 쓰는 컬럼만 조회한다(select * 는 딜 수천 건에서 불필요한
-  // 컬럼까지 직렬화·전송해 페이로드가 비대해진다).
-  let dealsQuery = supabase
+  // 컬럼까지 직렬화·전송해 페이로드가 비대해진다). 모든 단계(클로징·드랍 포함)를 표시한다.
+  const dealsQuery = supabase
     .from("deals")
     .select(
       "id, stage, next_action, next_action_date, investor_id, listing_id, lost_reason, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at)",
     )
     .order("created_at", { ascending: false });
-  // 기본은 진행 중 딜만 로드한다. 종료(클로징·드랍)된 딜은 누적되면 수천 건이 되어
-  // 보드 로드·렌더를 무겁게 하므로, '종료 딜 포함' 토글(?closed=1)일 때만 함께 불러온다.
-  if (!showClosed) {
-    dealsQuery = dealsQuery.not("stage", "in", "(클로징,드랍)");
-  }
 
   const [
     { data: dealRows },
@@ -102,7 +91,6 @@ export default async function DealsPage({
         holdingFunds={holdingFunds}
         listingFundMap={listingFundMap}
         listingBundles={listingBundles}
-        showClosed={showClosed}
       />
     </div>
   );
