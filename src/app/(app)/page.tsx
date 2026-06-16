@@ -129,6 +129,88 @@ export default async function DashboardHome({
         </Card>
       </div>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* 단계 전환율: 컨택 → 기업소개 → IR·실사 → 클로징 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              단계 전환율{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                이력 기준 누적 도달률
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {a.stageConversions.map((c) => (
+              <div key={c.from} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <Badge variant={DEAL_STAGE_VARIANT[c.from]}>{c.from}</Badge>
+                    <span className="text-muted-foreground">→</span>
+                    <Badge variant={DEAL_STAGE_VARIANT[c.to]}>{c.to}</Badge>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-semibold tabular-nums">
+                      {Math.round(c.rate * 100)}%
+                    </span>
+                    <span className="text-muted-foreground tabular-nums">
+                      {c.toCount}/{c.fromCount}건
+                    </span>
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary/70"
+                    style={{ width: `${Math.round(c.rate * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* IR·실사 단계로 가장 많이 이동된 매물 Top 3 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              IR·실사 도달 Top 3 매물{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                도달 투자사 수
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {a.topIrListings.length === 0 ? (
+              <p className="px-4 pb-4 text-sm text-muted-foreground">
+                IR·실사 단계에 도달한 매물이 없습니다.
+              </p>
+            ) : (
+              <div className="border-t border-border">
+                {a.topIrListings.map((row, i) => (
+                  <Link
+                    key={row.id}
+                    href={`/listings/${row.id}`}
+                    className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 last:border-0 hover:bg-muted/40"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="w-4 shrink-0 text-center text-sm font-semibold text-muted-foreground tabular-nums">
+                        {i + 1}
+                      </span>
+                      <span className="truncate text-sm font-medium">
+                        {row.company_name}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">
+                      {row.count}곳
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* 매물별 진척 */}
       <Card className="p-0">
         <div className="flex items-center justify-between px-4 pt-4">

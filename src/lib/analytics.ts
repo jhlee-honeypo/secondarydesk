@@ -28,6 +28,18 @@ export type StaleDealRow = {
   sinceStr: string;
 };
 export type LostReasonRow = { reason: string; count: number };
+export type StageConversionRow = {
+  from: DealStage;
+  to: DealStage;
+  fromCount: number; // from 단계에 도달한 딜 수
+  toCount: number; // 그중 to 단계까지 도달한 딜 수
+  rate: number; // toCount / fromCount (0..1)
+};
+export type TopIrListingRow = {
+  id: string;
+  company_name: string;
+  count: number; // IR·실사에 도달한 딜(=투자사) 수
+};
 
 export type AnalyticsData = {
   holdingFunds: { id: string; name: string }[];
@@ -41,6 +53,8 @@ export type AnalyticsData = {
   investorProgress: InvestorProgressRow[];
   staleDeals: StaleDealRow[];
   lostReasons: LostReasonRow[];
+  stageConversions: StageConversionRow[];
+  topIrListings: TopIrListingRow[];
 };
 
 type DealRow = {
@@ -59,6 +73,26 @@ type DealRow = {
 
 const TERMINAL: DealStage[] = ["클로징", "드랍"];
 const stageIndex = (s: DealStage) => DEAL_STAGES.indexOf(s);
+
+// 선형 진행 단계(드랍 제외) — 전환율·도달 집계용. 드랍은 어느 단계에서도 갈라지는
+// 종료라 선형 순서에 두지 않는다.
+const LINEAR_STAGES: DealStage[] = ["컨택", "기업소개", "IR·실사", "클로징"];
+const linearIndex = (s: DealStage) => LINEAR_STAGES.indexOf(s); // 드랍 → -1
+
+// 딜이 (기록상) 도달한 단계 집합. stage_events 에 더해, 현재/이력 중 가장 높은
+// 선형 단계까지의 모든 하위 선형 단계를 포함한다 — 이력 도입 전 백필 딜처럼 중간
+// 이벤트가 빠진 경우를 보정하고 단조성(상위 도달 ⇒ 하위 도달)을 보장해 전환율이
+// 100%를 넘지 않게 한다. 드랍은 선형이 아니므로 이벤트가 있을 때만 표시된다.
+function reachedStages(d: DealRow): Set<DealStage> {
+  const set = new Set<DealStage>();
+  let maxLi = linearIndex(d.stage);
+  for (const ev of d.stage_events ?? []) {
+    set.add(ev.stage);
+    maxLi = Math.max(maxLi, linearIndex(ev.stage));
+  }
+  for (let i = 0; i <= maxLi; i++) set.add(LINEAR_STAGES[i]);
+  return set;
+}
 
 // 정체(장기 미진척) 기준: 현재 단계 진입 후 이 일수 이상 움직임이 없는 비종료 딜.
 const STALE_DAYS = 30;
@@ -140,6 +174,43 @@ export async function loadAnalytics({
       amount: inStage.reduce((s, d) => s + (d.expected_amount ?? 0), 0),
     };
   });
+
+  // 단계 전환율 + IR·실사 도달 Top 매물 — 딜별 도달 단계 집합(이력 기반)으로 집계.
+  const reachedByDeal = new Map<string, Set<DealStage>>();
+  for (const d of deals) reachedByDeal.set(d.id, reachedStages(d));
+  const reachedCount = (stage: DealStage) =>
+    deals.filter((d) => reachedByDeal.get(d.id)!.has(stage)).length;
+  const rContact = reachedCount("컨택");
+  const rIntro = reachedCount("기업소개");
+  const rIr = reachedCount("IR·실사");
+  const rClose = reachedCount("클로징");
+  const convPairs: Omit<StageConversionRow, "rate">[] = [
+    { from: "컨택", to: "기업소개", fromCount: rContact, toCount: rIntro },
+    { from: "기업소개", to: "IR·실사", fromCount: rIntro, toCount: rIr },
+    { from: "IR·실사", to: "클로징", fromCount: rIr, toCount: rClose },
+  ];
+  const stageConversions: StageConversionRow[] = convPairs.map((x) => ({
+    ...x,
+    rate: x.fromCount > 0 ? x.toCount / x.fromCount : 0,
+  }));
+
+  // IR·실사 단계에 도달한 매물별 딜(=투자사) 수, 상위 3개
+  const irByListing = new Map<string, TopIrListingRow>();
+  for (const d of deals) {
+    if (!reachedByDeal.get(d.id)!.has("IR·실사")) continue;
+    const cur =
+      irByListing.get(d.listing_id) ??
+      ({
+        id: d.listing_id,
+        company_name: d.listing?.company_name ?? "—",
+        count: 0,
+      } satisfies TopIrListingRow);
+    cur.count += 1;
+    irByListing.set(d.listing_id, cur);
+  }
+  const topIrListings = [...irByListing.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
 
   // 매물별 진척: 노출 투자사 수(=딜 수, unique 제약) + 최고 도달 단계
   const byListing = new Map<string, ListingProgressRow>();
@@ -230,5 +301,7 @@ export async function loadAnalytics({
     investorProgress,
     staleDeals,
     lostReasons,
+    stageConversions,
+    topIrListings,
   };
 }
