@@ -156,9 +156,14 @@ export async function deleteInvestor(id: string): Promise<void> {
 // ---- 조합 (Fund) -----------------------------------------------------------
 
 function fundPayload(fd: FormData) {
+  const formationDate = text(fd, "formation_date");
   return {
     name: requiredText(fd, "name"),
-    vintage: intNum(fd, "vintage"),
+    formation_date: formationDate,
+    // 연도는 결성일에서 자동 도출(정렬·추정 폴백 호환). 결성일 없으면 vintage 입력 폴백.
+    vintage: formationDate
+      ? Number(formationDate.slice(0, 4)) || null
+      : intNum(fd, "vintage"),
     aum: num(fd, "aum"),
     dry_powder: num(fd, "dry_powder"),
     main_purpose: text(fd, "main_purpose"),

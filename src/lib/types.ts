@@ -73,6 +73,7 @@ export type Fund = {
   investor_id: string;
   name: string;
   vintage: number | null;
+  formation_date: string | null; // 결성일(일단위). vintage 는 이 값의 연도로 도출
   aum: number | null;
   dry_powder: number | null;
   main_purpose: string | null;

@@ -75,13 +75,15 @@ export function FundFormDialog({
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="결성연도(vintage)" htmlFor="vintage">
+            <Field label="결성일" htmlFor="formation_date">
               <Input
-                id="vintage"
-                name="vintage"
-                inputMode="numeric"
-                placeholder="2022"
-                defaultValue={fund?.vintage ?? ""}
+                id="formation_date"
+                name="formation_date"
+                type="date"
+                defaultValue={
+                  fund?.formation_date ??
+                  (fund?.vintage ? `${fund.vintage}-01-01` : "")
+                }
               />
             </Field>
             <Field label="구주 인수 선호도">

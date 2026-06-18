@@ -14,11 +14,14 @@ import {
   type UserRow,
 } from "@/lib/types";
 import { formatDate, formatKRW } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InvestorFormDialog } from "../_components/investor-form-dialog";
 import { FundFormDialog } from "../_components/fund-form-dialog";
+import { FundDryPowderCell } from "../_components/fund-dry-powder-cell";
+import { DryPowderInfo } from "../_components/dry-powder-info";
 import { ContactFormDialog } from "../_components/contact-form-dialog";
 import { DeleteDialog } from "@/components/app/delete-dialog";
 import { DealFormDialog } from "../../deals/_components/deal-form-dialog";
@@ -108,6 +111,20 @@ export default async function InvestorDetailPage({
   // 조합 결성약정총액 합
   const aumSum = funds.reduce((s, f) => s + (f.aum ?? 0), 0);
 
+  // 운용 조합은 등록연도(vintage) 최신순 — 올해 포함 직전 2개 연도(=최근 3개 vintage)에
+  // 결성된 조합은 미소진 재원이 남아 있을 수 있어 배경 하이라이트. vintage 없는 조합은 맨 아래.
+  const currentYear = new Date().getFullYear();
+  const HIGHLIGHT_FROM = currentYear - 2;
+  const sortedFunds = [...funds].sort((a, b) => {
+    const av = a.vintage ?? -Infinity;
+    const bv = b.vintage ?? -Infinity;
+    if (av !== bv) return bv - av;
+    return a.name.localeCompare(b.name, "ko");
+  });
+  const hasRecentFund = funds.some(
+    (f) => typeof f.vintage === "number" && f.vintage >= HIGHLIGHT_FROM,
+  );
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8">
       <Link
@@ -194,16 +211,26 @@ export default async function InvestorDetailPage({
               ({funds.length})
             </span>
           </h2>
-          <FundFormDialog
-            investorId={investor.id}
-            trigger={
-              <Button size="sm">
-                <Plus />
-                조합
-              </Button>
-            }
-          />
+          <div className="flex items-center gap-1">
+            <DryPowderInfo />
+            <FundFormDialog
+              investorId={investor.id}
+              trigger={
+                <Button size="sm">
+                  <Plus />
+                  조합
+                </Button>
+              }
+            />
+          </div>
         </div>
+
+        {hasRecentFund && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-block size-2.5 rounded-sm bg-emerald-200 dark:bg-emerald-900" />
+            강조 = 최근 3개 연도({HIGHLIGHT_FROM}–{currentYear}) 결성 — 미소진 재원이 남아 있을 수 있음
+          </p>
+        )}
 
         {funds.length === 0 ? (
           <Card className="items-center justify-center py-12 text-center">
@@ -218,12 +245,15 @@ export default async function InvestorDetailPage({
                 <thead>
                   <tr className="border-b border-border text-left text-xs whitespace-nowrap text-muted-foreground">
                     <th className="px-4 py-2.5 font-medium">조합명</th>
-                    <th className="px-4 py-2.5 font-medium">등록연도</th>
+                    <th className="px-4 py-2.5 font-medium">결성일</th>
                     <th className="px-4 py-2.5 font-medium">만기일</th>
                     <th className="px-4 py-2.5 font-medium">목적구분</th>
                     <th className="px-4 py-2.5 font-medium">투자분야</th>
                     <th className="px-4 py-2.5 text-right font-medium">
                       결성약정총액
+                    </th>
+                    <th className="px-4 py-2.5 font-medium">
+                      드라이파우더 (추정)
                     </th>
                     <th className="w-16 px-4 py-2.5">
                       <span className="sr-only">관리</span>
@@ -231,14 +261,26 @@ export default async function InvestorDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {funds.map((fund) => (
+                  {sortedFunds.map((fund) => {
+                    const recent =
+                      typeof fund.vintage === "number" &&
+                      fund.vintage >= HIGHLIGHT_FROM;
+                    return (
                     <tr
                       key={fund.id}
-                      className="border-b border-border last:border-0 align-top hover:bg-muted/40"
+                      className={cn(
+                        "border-b border-border last:border-0 align-top hover:bg-muted/40",
+                        recent &&
+                          "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/40",
+                      )}
                     >
                       <td className="px-4 py-3 font-medium">{fund.name}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
-                        {fund.vintage ?? "—"}
+                        {fund.formation_date
+                          ? formatDate(fund.formation_date)
+                          : fund.vintage
+                            ? `${fund.vintage}년`
+                            : "—"}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
                         {fund.maturity_date
@@ -255,6 +297,9 @@ export default async function InvestorDetailPage({
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
                         {fund.aum ? formatKRW(fund.aum) : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <FundDryPowderCell fund={fund} />
                       </td>
                       <td className="px-2 py-3">
                         <div className="flex justify-end gap-1">
@@ -288,7 +333,8 @@ export default async function InvestorDetailPage({
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
