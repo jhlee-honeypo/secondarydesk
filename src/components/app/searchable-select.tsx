@@ -22,6 +22,7 @@ export function SearchableSelect({
   className,
   triggerClassName,
   ariaLabel,
+  portal = true,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -32,6 +33,9 @@ export function SearchableSelect({
   className?: string;
   triggerClassName?: string;
   ariaLabel?: string;
+  // Dialog 안에서는 portal=false 로 두어 스크롤 잠금(react-remove-scroll)에
+  // 막히지 않게 한다(밖에서는 기본 Portal 로 클리핑 방지).
+  portal?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -67,7 +71,7 @@ export function SearchableSelect({
         </span>
         <ChevronDown className="size-4 shrink-0 opacity-50" />
       </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
+      <Wrapper portal={portal}>
         <PopoverPrimitive.Content
           align="start"
           sideOffset={4}
@@ -119,7 +123,22 @@ export function SearchableSelect({
             )}
           </div>
         </PopoverPrimitive.Content>
-      </PopoverPrimitive.Portal>
+      </Wrapper>
     </PopoverPrimitive.Root>
+  );
+}
+
+// portal=true 면 Portal 로 감싸고, false 면 그대로 둔다(Dialog 내 스크롤 호환).
+function Wrapper({
+  portal,
+  children,
+}: {
+  portal: boolean;
+  children: React.ReactNode;
+}) {
+  return portal ? (
+    <PopoverPrimitive.Portal>{children}</PopoverPrimitive.Portal>
+  ) : (
+    <>{children}</>
   );
 }

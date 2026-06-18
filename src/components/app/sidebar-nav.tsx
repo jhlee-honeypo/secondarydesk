@@ -10,6 +10,7 @@ import {
   Landmark,
   LayoutDashboard,
   Package,
+  Stethoscope,
   Users,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/listings", label: "매물", icon: Package, ready: true },
   { href: "/funds", label: "운용펀드", icon: Landmark, ready: true },
   { href: "/exit-scenario", label: "EXIT Simulator", icon: Calculator, ready: true },
+  { href: "/financials", label: "재무 점검", icon: Stethoscope, ready: true },
 ];
 
 // lead(관리자) 전용 항목

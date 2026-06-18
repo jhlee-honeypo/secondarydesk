@@ -361,6 +361,37 @@ export type ActivityCard = Activity & {
   deal: { id: string; listing: { company_name: string } | null } | null;
 };
 
+// 재무 점검 — 재무제표 분기 행 (financial_statements 테이블)
+export type FinancialStatement = {
+  id: string;
+  company_name: string;
+  company_name_en: string | null;
+  bubble_company_id: string | null;
+  report_year: number;
+  report_month: number; // 3/6/9/12
+  rev_curr: number;
+  ni_curr: number;
+  rev_prev: number;
+  ni_prev: number;
+  cash: number;
+  savings: number;
+  total_equity: number;
+  capital: number;
+  sga: number;
+  source: "upload" | "slab";
+  source_file: string | null;
+  source_file_url: string | null;
+  // slab 분기보고 정성 정보(참고)
+  funding_round: string | null;
+  funding_series: string | null;
+  total_raised: number | null;
+  business_highlight: string | null;
+  head_count: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // 단계별 배지/컬럼 강조 색상 (클로징=성사, 드랍=중단)
 export const DEAL_STAGE_VARIANT: Record<
   DealStage,

@@ -49,8 +49,9 @@ async function fetchAll(type: string): Promise<Record<string, unknown>[]> {
 
   const rows: Record<string, unknown>[] = [];
   let cursor = 0;
-  // 최대 10페이지(1000건) 안전장치.
-  for (let i = 0; i < 10; i++) {
+  // 최대 50페이지(5000건) 안전장치. quarterlyupdate 가 1800건+ 이라 10페이지(1000건)
+  // 상한이면 뒷부분 분기 보고가 누락된다(재무 점검 분기 목록이 일부만 떴던 원인).
+  for (let i = 0; i < 50; i++) {
     const resp = await bubblePage(type, cursor, 100);
     const batch = resp?.results ?? [];
     rows.push(...batch);
@@ -310,6 +311,156 @@ export async function getBubbleInvestmentsByCompany(
 export async function getAllBubbleInvestments(): Promise<BubbleInvestment[]> {
   const rows = await fetchAll("sparklabinvestment");
   return rows.map(normInvestment).filter((x) => x.company);
+}
+
+// ---- 재무 점검 — slab 분기현황의 재무제표 파일/지표 ------------------------
+// 기업이 분기마다 slab 에 올린 `financial report` PDF 와, 함께 기입한 현금/런웨이
+// 지표를 가져온다(재무 점검 탭의 "slab에서 가져오기" 소스).
+
+export type SlabFinancialReport = {
+  key: string; // `${companyId}|${year}|${month}` (분기 단위 멱등 식별)
+  companyId: string; // sparkERP company _id
+  nameKr: string;
+  nameEn: string | null;
+  fundIds: string[]; // 소속 조합(slab fund) _id — 조합명은 DB(holding_funds.bubble_id)에서 변환
+  year: number;
+  month: number; // 3 / 6 / 9 / 12 (분기→누적월)
+  quarter: string; // "1분기" 등
+  hasFile: boolean; // 재무제표 파일 제출 여부(false=미제출, 선택 불가)
+  fileUrls: string[]; // 제출 파일(들) — BS/IS 분리 제출이면 2개+ (미제출이면 [])
+  fileName: string; // 표시용 요약(단일이면 파일명, 복수면 "N개 파일")
+  // slab 기입 지표(참고 표시용 — 판정은 PDF 추출값 우선)
+  currentCash: number | null;
+  runRate: number | null; // 월평균매출(run rate)
+  burnRate: number | null; // 월평균소모(burn rate)
+  runway: number | null; // 런웨이(개월)
+  // slab 분기보고 정성 정보(참고 표시용)
+  newFundingRound: string | null; // 투자유치여부 ("None"/"Done"/"Expected" 등)
+  fundingSeries: string | null; // 진행/완료 라운드 시리즈
+  totalRaised: number | null; // 누적 조달액
+  businessHighlight: string | null; // 비즈니스 하이라이트(사업/개발/영업 현황)
+  headCount: number | null; // 직원 수
+};
+
+const QUARTER_MONTH: Record<string, number> = {
+  "1분기": 3,
+  "2분기": 6,
+  "3분기": 9,
+  "4분기": 12,
+};
+
+function normCdnUrl(u: unknown): string | null {
+  if (typeof u !== "string" || !u) return null;
+  return u.startsWith("//") ? "https:" + u : u;
+}
+
+function fileNameFromUrl(u: string): string {
+  try {
+    const last = u.split("/").pop() ?? u;
+    return decodeURIComponent(last);
+  } catch {
+    return u;
+  }
+}
+
+/** 재무제표 파일을 가진 모든 분기 보고(회사명·소속조합 ID 포함). 분기 단위로 1건씩. */
+export async function getSlabFinancialReports(): Promise<SlabFinancialReport[]> {
+  const [companyRows, quarterRows] = await Promise.all([
+    fetchAll("company"),
+    fetchAll("quarterlyupdate"),
+  ]);
+
+  // slab `fund` 타입이 비어있을 수 있어(이름 변환 불가) 여기선 raw fund _id 만 싣고,
+  // 조합명 변환은 action 에서 DB(holding_funds.bubble_id)로 수행한다.
+  const infoById = new Map<
+    string,
+    { kr: string; en: string | null; fundIds: string[] }
+  >();
+  for (const c of companyRows) {
+    const id = String(c._id ?? "");
+    if (!id) continue;
+    const fundTypeIds = Array.isArray(c["fund type"])
+      ? (c["fund type"] as unknown[]).map((x) => String(x))
+      : [];
+    infoById.set(id, {
+      kr: str(c["company name"]) ?? "(이름 없음)",
+      en: str(c["company name eng"]),
+      fundIds: fundTypeIds,
+    });
+  }
+
+  // 모든 분기 보고를 (회사,분기) 단위로 수집 — 파일 유무는 hasFile 로 표시.
+  // 같은 (회사,분기) 중복 시 파일 있는 행을 우선한다.
+  const byKey = new Map<string, SlabFinancialReport>();
+  for (const r of quarterRows) {
+    const cid = str(r["company"]);
+    if (!cid) continue;
+    const year = nnum(r["year"]) ?? 0;
+    const quarter = str(r["quarter"]) ?? "";
+    const month = QUARTER_MONTH[quarter] ?? 0;
+    if (year <= 0 || month <= 0) continue; // 분기/연도 없는 행 제외(키·분모 불가)
+    const fr = r["financial report"];
+    const urls = Array.isArray(fr)
+      ? (fr.map(normCdnUrl).filter(Boolean) as string[])
+      : [];
+    const info = infoById.get(cid);
+    const item: SlabFinancialReport = {
+      key: `${cid}|${year}|${month}`,
+      companyId: cid,
+      nameKr: info?.kr ?? "(이름 없음)",
+      nameEn: info?.en ?? null,
+      fundIds: info?.fundIds ?? [],
+      year,
+      month,
+      quarter,
+      hasFile: urls.length > 0,
+      fileUrls: urls,
+      fileName:
+        urls.length === 0
+          ? ""
+          : urls.length === 1
+            ? fileNameFromUrl(urls[0])
+            : `${urls.length}개 파일`,
+      currentCash: nnum(r["current cash"]),
+      runRate: nnum(r["monthly average run rate"]),
+      burnRate: nnum(r["monthly average burn rate"]),
+      runway: nnum(r["runway(month)"]),
+      newFundingRound: str(r["any new funding round?"]),
+      fundingSeries: str(r["funding series"]),
+      totalRaised: nnum(r["total amount raised"]),
+      businessHighlight: str(r["business highlight_overview"]),
+      headCount: nnum(r["head count"]),
+    };
+    const prev = byKey.get(item.key);
+    // 중복 (회사,분기): 파일 있는 행 우선, 둘 다 있으면 파일 많은 행 우선
+    if (
+      !prev ||
+      (!prev.hasFile && item.hasFile) ||
+      (prev.hasFile && item.hasFile && item.fileUrls.length > prev.fileUrls.length)
+    )
+      byKey.set(item.key, item);
+  }
+  // 최신 분기 → 회사명 순
+  return [...byKey.values()].sort(
+    (a, b) =>
+      b.year - a.year ||
+      (QUARTER_ORD[b.quarter] ?? 0) - (QUARTER_ORD[a.quarter] ?? 0) ||
+      a.nameKr.localeCompare(b.nameKr, "ko"),
+  );
+}
+
+/** slab CDN 의 재무제표 파일(PDF·이미지·엑셀)을 받아 bytes 로 반환(추출 입력용). */
+export async function fetchSlabFile(
+  url: string,
+): Promise<{ bytes: Uint8Array; mediaType: string; fileName: string }> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`파일 다운로드 실패 ${res.status}`);
+  const mediaType = res.headers.get("content-type")?.split(";")[0] ?? "application/pdf";
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return { bytes, mediaType, fileName: fileNameFromUrl(url) };
 }
 
 // ---- 매물 상세 ERP 개요(주식정보·스파크랩 투자·후속투자) --------------------

@@ -163,3 +163,13 @@
     @apply font-sans;
   }
 }
+
+/* 진행률 미확정(목록 로딩·업로드) 시 좌→우로 흐르는 인디터미닛 바 */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
