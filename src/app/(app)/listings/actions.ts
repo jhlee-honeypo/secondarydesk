@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getErpCompanyOverview } from "@/lib/bubble";
 import type { ExitScenarioRound } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -153,6 +154,34 @@ export async function getListingRounds(listingId: string): Promise<
     rounds: (data ?? []) as ExitScenarioRound[],
     latestPrice: (lst?.latest_round_price ?? null) as number | null,
   };
+}
+
+// EXIT 시뮬레이터 단가 추정용 — slab(sparkERP)에서 회사 발행주식총수·주당가격을
+// 끌어온다. 매물이 slab 회사(bubble_id)에 연결돼 있어야 한다(미연결 시 null).
+export async function getListingErpShares(listingId: string): Promise<
+  | { ok: true; sharesOutstanding: number | null; sharePrice: number | null }
+  | { ok: false; error: string }
+> {
+  if (!listingId) return { ok: false, error: "잘못된 요청입니다." };
+  const supabase = await createClient();
+  const { data: lst, error } = await supabase
+    .from("listings")
+    .select("bubble_id")
+    .eq("id", listingId)
+    .single();
+  if (error) return { ok: false, error: error.message };
+  const bubbleId = (lst?.bubble_id ?? null) as string | null;
+  if (!bubbleId) return { ok: true, sharesOutstanding: null, sharePrice: null };
+  try {
+    const overview = await getErpCompanyOverview(bubbleId);
+    return {
+      ok: true,
+      sharesOutstanding: overview.stock.sharesOutstanding,
+      sharePrice: overview.stock.sharePrice,
+    };
+  } catch {
+    return { ok: false, error: "slab 조회에 실패했습니다." };
+  }
 }
 
 // ---- 매물 (Listing) --------------------------------------------------------

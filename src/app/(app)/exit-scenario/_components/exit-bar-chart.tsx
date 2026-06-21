@@ -16,11 +16,25 @@ const TICK_COUNT = 5; // 0 포함 6개 라인
 export function ExitBarChart({
   rows,
   principal,
+  compareRows,
+  baseLabel = "현재(최신 단가)",
+  compareLabel = "다음 라운드(예상)",
 }: {
   rows: ProjectionRow[];
   principal: number;
+  /** 비교 시리즈(다음 라운드 예상 단가 기준). 있으면 그룹 막대로 나란히 표시. */
+  compareRows?: ProjectionRow[];
+  baseLabel?: string;
+  compareLabel?: string;
 }) {
-  const rawMax = Math.max(principal, ...rows.map((r) => r.saleTotal), 0);
+  const compare = compareRows && compareRows.length > 0 ? compareRows : null;
+
+  const rawMax = Math.max(
+    principal,
+    ...rows.map((r) => r.saleTotal),
+    ...(compare ? compare.map((r) => r.saleTotal) : []),
+    0,
+  );
   const max = niceCeil(rawMax);
 
   const ticks = Array.from({ length: TICK_COUNT + 1 }, (_, i) =>
@@ -37,6 +51,19 @@ export function ExitBarChart({
         <CardTitle className="text-base">할인율별 매각 총액</CardTitle>
       </CardHeader>
       <CardContent>
+        {compare && (
+          <div className="mb-3 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2.5 rounded-sm bg-sky-500/80" />
+              {baseLabel}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2.5 rounded-sm bg-violet-500/80" />
+              {compareLabel}
+            </span>
+          </div>
+        )}
+
         <div className="flex gap-2">
           {/* Y축 라벨 (천원) */}
           <div className="flex h-72 w-14 flex-col-reverse justify-between py-0 text-right text-[10px] text-muted-foreground">
@@ -73,23 +100,41 @@ export function ExitBarChart({
 
               {/* 막대 */}
               <div className="absolute inset-0 flex items-end gap-1 px-1">
-                {rows.map((r) => (
-                  <div
-                    key={r.discount}
-                    className="flex h-full flex-1 items-end justify-center"
-                  >
+                {rows.map((r, i) => {
+                  const c = compare ? compare[i] : null;
+                  return (
                     <div
-                      className={cn(
-                        "w-2/3 rounded-t-sm transition-[height]",
-                        r.isProfit
-                          ? "bg-emerald-500/80 dark:bg-emerald-500/70"
-                          : "bg-red-400/80 dark:bg-red-500/60",
+                      key={r.discount}
+                      className="flex h-full flex-1 items-end justify-center gap-0.5"
+                    >
+                      {c ? (
+                        <>
+                          <div
+                            className="w-[42%] rounded-t-sm bg-sky-500/80 transition-[height] dark:bg-sky-500/70"
+                            style={{ height: `${pct(r.saleTotal)}%` }}
+                            title={`${baseLabel} · ${Math.round(r.discount * 100)}% · ${kLabel(r.saleTotal)}천원`}
+                          />
+                          <div
+                            className="w-[42%] rounded-t-sm bg-violet-500/80 transition-[height] dark:bg-violet-500/70"
+                            style={{ height: `${pct(c.saleTotal)}%` }}
+                            title={`${compareLabel} · ${Math.round(c.discount * 100)}% · ${kLabel(c.saleTotal)}천원`}
+                          />
+                        </>
+                      ) : (
+                        <div
+                          className={cn(
+                            "w-2/3 rounded-t-sm transition-[height]",
+                            r.isProfit
+                              ? "bg-emerald-500/80 dark:bg-emerald-500/70"
+                              : "bg-red-400/80 dark:bg-red-500/60",
+                          )}
+                          style={{ height: `${pct(r.saleTotal)}%` }}
+                          title={`${Math.round(r.discount * 100)}% · ${kLabel(r.saleTotal)}천원`}
+                        />
                       )}
-                      style={{ height: `${pct(r.saleTotal)}%` }}
-                      title={`${Math.round(r.discount * 100)}% · ${kLabel(r.saleTotal)}천원`}
-                    />
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
