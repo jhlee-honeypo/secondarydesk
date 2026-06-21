@@ -54,11 +54,11 @@ export function ExitBarChart({
         {compare && (
           <div className="mb-3 flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block size-2.5 rounded-sm bg-sky-500/80" />
+              <span className="inline-block size-2.5 rounded-sm bg-blue-600" />
               {baseLabel}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block size-2.5 rounded-sm bg-violet-500/80" />
+              <span className="inline-block size-2.5 rounded-sm bg-amber-500" />
               {compareLabel}
             </span>
           </div>
@@ -110,12 +110,12 @@ export function ExitBarChart({
                       {c ? (
                         <>
                           <div
-                            className="w-[42%] rounded-t-sm bg-sky-500/80 transition-[height] dark:bg-sky-500/70"
+                            className="w-[42%] rounded-t-sm bg-blue-600 transition-[height] dark:bg-blue-500"
                             style={{ height: `${pct(r.saleTotal)}%` }}
                             title={`${baseLabel} · ${Math.round(r.discount * 100)}% · ${kLabel(r.saleTotal)}천원`}
                           />
                           <div
-                            className="w-[42%] rounded-t-sm bg-violet-500/80 transition-[height] dark:bg-violet-500/70"
+                            className="w-[42%] rounded-t-sm bg-amber-500 transition-[height] dark:bg-amber-400"
                             style={{ height: `${pct(c.saleTotal)}%` }}
                             title={`${compareLabel} · ${Math.round(c.discount * 100)}% · ${kLabel(c.saleTotal)}천원`}
                           />
