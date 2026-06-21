@@ -16,7 +16,7 @@ const FIELDS: ImportField[] = [
   { key: "oper_inst_nm", label: "회사명(운용사)", required: true },
   { key: "oper_inst_id", label: "운용사ID (투자사 식별 키)" },
   { key: "asct_nm", label: "조합명", required: true },
-  { key: "reg_date", label: "등록일 → 결성연도" },
+  { key: "reg_date", label: "등록일 → 결성일" },
   { key: "aum", label: "결성총액(원)" },
   { key: "maturity_date", label: "만기일" },
   { key: "invst_fld", label: "투자분야 → 섹터" },

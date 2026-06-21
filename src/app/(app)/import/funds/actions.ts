@@ -13,7 +13,7 @@ export type FundImportRow = {
   oper_inst_id?: string; // 운용사ID — 투자사 식별 키
   oper_inst_nm?: string; // 회사명(운용사)
   asct_nm?: string; // 조합명(필수)
-  reg_date?: string; // 등록일 → vintage(연도)
+  reg_date?: string; // 등록일 → formation_date(일단위) + vintage(연도)
   aum?: string; // 결성총액(원)
   maturity_date?: string; // 만기일
   invst_fld?: string; // 투자분야 → sector_focus
@@ -87,6 +87,7 @@ type DivaPayload = {
   name: string;
   aum: number | null;
   vintage: number | null;
+  formation_date: string | null;
   maturity_date: string | null;
   sector_focus: string[] | null;
   main_purpose: string | null;
@@ -216,6 +217,7 @@ export async function importFunds(
         name: clean(r.asct_nm)!,
         aum: num(clean(r.aum ?? null)),
         vintage: yearOf(clean(r.reg_date ?? null)),
+        formation_date: dateOrNull(clean(r.reg_date ?? null)),
         maturity_date: dateOrNull(clean(r.maturity_date ?? null)),
         sector_focus: sectors(clean(r.invst_fld ?? null)),
         main_purpose: purposeOrNull(clean(r.purpose ?? null)),

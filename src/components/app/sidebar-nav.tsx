@@ -10,6 +10,7 @@ import {
   Landmark,
   LayoutDashboard,
   Package,
+  Search,
   Stethoscope,
   Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/", label: "대시보드", icon: LayoutDashboard, ready: true },
   { href: "/deals", label: "딜 보드", icon: KanbanSquare, ready: true },
   { href: "/investors", label: "투자사", icon: Building2, ready: true },
+  { href: "/associations", label: "조합 탐색", icon: Search, ready: true },
   { href: "/listings", label: "매물", icon: Package, ready: true },
   { href: "/funds", label: "운용펀드", icon: Landmark, ready: true },
   { href: "/exit-scenario", label: "EXIT Simulator", icon: Calculator, ready: true },
