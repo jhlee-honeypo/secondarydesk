@@ -3,13 +3,13 @@ import {
   ArrowRight,
   Building2,
   Calculator,
+  Compass,
   KanbanSquare,
   Landmark,
   LayoutDashboard,
   Lightbulb,
   Package,
-  Upload,
-  Users,
+  Stethoscope,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,7 +24,6 @@ type GuideSection = {
   summary: string;
   items: string[];
   tip?: string;
-  admin?: boolean;
 };
 
 // 각 메뉴별 안내(초안) — 팀원이 처음 봐도 무엇을·어떻게 하는지 알 수 있게.
@@ -52,7 +51,9 @@ const GUIDE: GuideSection[] = [
       "카드는 현재 단계 진입일 기준 최신순 정렬, ‘기업소개’ 2개월 경과 카드는 음영 처리(사실상 드랍).",
       "‘딜’ 버튼으로 새 딜 생성 — 투자사(신규/기존) + 매물 복수 선택, 즐겨찾기 묶음으로 일괄 추가.",
       "단계를 ‘드랍’으로 두면 드랍 사유 입력칸이 나타납니다.",
-      "‘가져오기’로 엑셀·CSV 일괄 등록, 필터 조합은 ‘저장된 뷰’로 재사용.",
+      "여럿이 함께 써도 카드 이동이 화면에 실시간 반영되고, 카드의 단계 이력에 누가 옮겼는지 표시됩니다.",
+      "딜을 다른 팀원에게 넘길 땐 딜 수정에서 담당자를 바꾸면 됩니다.",
+      "필터 조합은 ‘저장된 뷰’로 재사용할 수 있습니다.",
     ],
     tip: "카드를 잘못 옮겼다면, 카드를 열어 ‘단계 이력’에서 잘못된 기록을 지우세요. 남은 최신 단계로 카드가 자동으로 되돌아갑니다.",
   },
@@ -64,9 +65,21 @@ const GUIDE: GuideSection[] = [
     items: [
       "등록일 최신순 목록 · 이름/유형/담당으로 검색 · 행별 삭제.",
       "상세에서 유형·만난일자·개요 메모, 컨택(심사역)·조합(펀드) 관리.",
-      "명함(리멤버) 백데이터를 ‘명함 등록’으로 올리면, 딜·가져오기에서 이름만으로 연락처가 자동 채워집니다.",
+      "딜·미팅 입력 시 이름으로 명함을 검색하면 소속·연락처가 자동으로 채워집니다.",
+      "같은 투자사를 다른 표기로 입력하면 기존 투자사 후보를 제안해 하나의 이름으로 모읍니다(중복 방지).",
     ],
-    tip: "투자사를 삭제하면 소속 조합·컨택·딜·활동이 함께 사라집니다. 삭제 모달에서 Enter로 바로 확정할 수 있어요.",
+    tip: "투자사를 삭제하면 소속 조합·컨택·딜·활동이 함께 사라집니다. 실수 방지를 위해, 삭제 시 투자사명을 직접 입력해야 확정됩니다.",
+  },
+  {
+    icon: Compass,
+    title: "조합 탐색",
+    href: "/associations",
+    summary: "투자사가 운용하는 조합을 살펴보고 투자 여력을 가늠합니다.",
+    items: [
+      "운용사별 조합(펀드) 목록과 결성일·만기 등 기본 정보를 확인합니다.",
+      "드라이파우더(잔여 투자가능 재원) 추정으로 실제 집행 여력을 가늠합니다.",
+      "구주 인수 여력이 있어 보이는 조합을 추려 딜 매칭에 활용하세요.",
+    ],
   },
   {
     icon: Package,
@@ -76,7 +89,6 @@ const GUIDE: GuideSection[] = [
     items: [
       "매물 목록·상세에서 회사 정보·운용펀드 연결을 관리합니다.",
       "상세의 적합도 추천으로 어울리는 투자사 조합을 찾고 1클릭으로 딜을 만들 수 있습니다.",
-      "‘가져오기’로 매물도 일괄 등록할 수 있습니다.",
     ],
   },
   {
@@ -101,28 +113,16 @@ const GUIDE: GuideSection[] = [
     ],
   },
   {
-    icon: Upload,
-    title: "가져오기 & 명함",
-    href: "/deals/import",
-    summary: "엑셀·CSV·명함으로 데이터를 한 번에 등록합니다.",
+    icon: Stethoscope,
+    title: "재무 점검",
+    href: "/financials",
+    summary: "포트폴리오사의 재무제표를 분석해 건전성을 점검합니다.",
     items: [
-      "딜 가져오기: 한 투자사에 여러 매물(묶음/세미콜론)·드랍 사유까지 한 행으로 펼쳐 등록.",
-      "이름만 적어도 명함(리멤버)에서 이메일·휴대폰을 자동 채움, 못 찾으면 직접 입력 안내.",
-      "매물·명함도 각각 일괄 가져오기 지원.",
-      "DIVA 조합 가져오기: 벤처캐피탈협회 전자공시 조합 목록을 운용사명으로 매칭해 투자사별 조합으로 적재.",
+      "재무제표(PDF·이미지)를 올리면 매출·순이익·자본 등 핵심 값이 자동으로 추출됩니다.",
+      "추출 값으로 매출 추이·자본잠식 등 건전성 신호를 판정합니다.",
+      "sparkERP 연동 재무 데이터도 함께 검토할 수 있습니다.",
+      "AI 추출(OCR) 비용은 재무제표 1건(1개사)당 대략 $0.02~0.05(수십 원) 수준입니다.",
     ],
-    tip: "가져오기 실행 전 ‘펼친 실제 딜 수’가 버튼에 표시됩니다. 묶음이 매칭 안 되면 0개로 떠서 실수를 막아줘요.",
-  },
-  {
-    icon: Users,
-    title: "구성원",
-    href: "/members",
-    summary: "팀원 승인과 권한을 관리합니다. (관리자 전용)",
-    items: [
-      "가입 신청한 팀원을 승인하고 역할을 지정합니다.",
-      "관리자(lead)에게만 메뉴가 보입니다.",
-    ],
-    admin: true,
   },
 ];
 
@@ -137,9 +137,11 @@ export default function GuidePage() {
           SecondaryDesk 알아보기
         </h1>
         <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
-          구주(세컨더리) 매칭 워크스페이스입니다. 포트폴리오 매물과 투자사를
-          연결하고, 딜 파이프라인을 한곳에서 관리합니다. 처음이라면 아래 흐름과
-          메뉴 안내를 먼저 살펴보세요.
+          구주(세컨더리) 매칭 워크스페이스입니다.
+          <br />
+          포트폴리오 매물과 투자사를 연결하고, 딜 파이프라인을 한곳에서 관리합니다.
+          <br />
+          처음이라면 아래 흐름과 메뉴 안내를 먼저 살펴보세요.
         </p>
       </header>
 
@@ -188,7 +190,7 @@ export default function GuidePage() {
 }
 
 function GuideCard({ section }: { section: GuideSection }) {
-  const { icon: Icon, title, href, summary, items, tip, admin } = section;
+  const { icon: Icon, title, href, summary, items, tip } = section;
   return (
     <Card>
       <CardHeader>
@@ -200,11 +202,6 @@ function GuideCard({ section }: { section: GuideSection }) {
             <div className="space-y-0.5">
               <CardTitle className="flex items-center gap-2 text-base">
                 {title}
-                {admin && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-                    관리자 전용
-                  </span>
-                )}
               </CardTitle>
               <p className="text-sm text-muted-foreground">{summary}</p>
             </div>
