@@ -1,5 +1,7 @@
 # PRD: VC 구주 세일즈 CRM (코드네임: SecondaryDesk)
 
+> 📌 이 문서는 **초기 설계 기준(baseline) 스펙**입니다. 이후 추가된 기능과 현재 구현 현황은 [README](./README.md)를 참조하세요.
+
 > 만기 펀드 EXIT를 위한 구주(Secondary) 세일즈 활동을 관리하는 내부용 B2B Sales CRM
 > 작성 목적: Claude Code 기반 개발을 위한 제품 요구사항 정의서
 
