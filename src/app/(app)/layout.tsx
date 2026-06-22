@@ -35,8 +35,8 @@ export default async function AppLayout({
           <div className="mt-2 flex-1 overflow-y-auto overflow-x-hidden pb-4">
             <SidebarNav isLead={isLead} />
           </div>
-          <div className="px-5 py-3">
-            <span className="block whitespace-nowrap text-[11px] font-medium text-sidebar-foreground/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="mt-auto border-t border-sidebar-border px-5 py-3">
+            <span className="block whitespace-nowrap text-xs font-medium text-sidebar-foreground/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
               {APP_VERSION_LABEL}
             </span>
           </div>
