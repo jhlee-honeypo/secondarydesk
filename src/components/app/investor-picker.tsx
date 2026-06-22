@@ -20,6 +20,9 @@ import {
   searchBusinessCards,
   type BusinessCardHit,
 } from "@/app/(app)/import/contacts/actions";
+import { searchInvestors } from "@/app/(app)/deals/actions";
+import { type InvestorMatch } from "@/lib/investor-aliases";
+import { normName } from "@/lib/normalize";
 
 export type InvestorOption = { id: string; name: string };
 
@@ -78,6 +81,40 @@ export function InvestorPicker({
   const cardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardSeqRef = useRef(0);
 
+  // 기존 투자사 후보(정규명·별칭 매칭) — 신규 입력 시 라벨 분산을 막기 위한 제안.
+  const [invMatches, setInvMatches] = useState<InvestorMatch[]>([]);
+  const invTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const invSeqRef = useRef(0);
+  // 변형 표기로 기존 투자사를 고른 경우, 그 표기를 별칭으로 서버에 기록하기 위한 후보.
+  const [aliasCandidate, setAliasCandidate] = useState("");
+
+  // 투자사명 입력 → 정규화 일치 후보를 디바운스 검색(2글자+). 기존 레코드에 연결하도록 제안.
+  function handleInvestorName(v: string) {
+    setInvestorName(v);
+    if (invTimerRef.current) clearTimeout(invTimerRef.current);
+    if (normName(v).length < 2) {
+      invSeqRef.current++;
+      setInvMatches([]);
+      return;
+    }
+    invTimerRef.current = setTimeout(async () => {
+      const seq = ++invSeqRef.current;
+      const hits = await searchInvestors(v);
+      if (seq !== invSeqRef.current) return;
+      setInvMatches(hits);
+    }, 250);
+  }
+
+  // 후보 클릭 → 기존 투자사 연결로 전환. 입력했던 표기는 별칭 기록용으로 보관.
+  function handlePickInvestor(m: InvestorMatch) {
+    setAliasCandidate(investorName);
+    setMode("existing");
+    setInvestorId(m.id);
+    setInvMatches([]);
+    if (invTimerRef.current) clearTimeout(invTimerRef.current);
+    invSeqRef.current++;
+  }
+
   function addFundRow() {
     setFundKeys((keys) => [...keys, (keys[keys.length - 1] ?? 0) + 1]);
   }
@@ -114,15 +151,17 @@ export function InvestorPicker({
   // 아니면 새 투자사 등록 모드로 회사·사람·직위를 프리필한다.
   function handlePickCard(card: BusinessCardHit) {
     const company = (card.company ?? "").trim();
+    // 소속을 정규화 기준으로 기존 투자사와 대조(법인격·공백 차이 흡수).
     const matched = company
-      ? investors.find(
-          (i) => i.name.trim().toLowerCase() === company.toLowerCase(),
-        )
+      ? investors.find((i) => normName(i.name) === normName(company))
       : undefined;
 
     if (matched) {
       setMode("existing");
       setInvestorId(matched.id);
+      // 명함 소속 표기가 정규명과 다르면 별칭으로 기록되게 보관.
+      setAliasCandidate(company);
+      setInvMatches([]);
     } else {
       setMode("new");
       setInvestorName(company);
@@ -132,6 +171,8 @@ export function InvestorPicker({
       setContactPhone(card.phone ?? "");
       setContactLocked(true); // 명함 출처 연락처 잠금
       if (showMetDate && card.met_date) onMetDateChange?.(card.met_date);
+      // 정확 일치는 없지만 유사 후보가 있을 수 있으니 제안 검색을 띄운다.
+      handleInvestorName(company);
     }
     // 선택 후 진행 중인 디바운스 검색이 결과를 다시 채우지 않도록 취소
     if (cardTimerRef.current) clearTimeout(cardTimerRef.current);
@@ -144,6 +185,11 @@ export function InvestorPicker({
   return (
     <div className="space-y-3">
       <input type="hidden" name="investor_mode" value={mode} />
+      <input
+        type="hidden"
+        name="investor_alias_candidate"
+        value={aliasCandidate}
+      />
 
       {/* 명함 검색 — 백데이터에서 이름으로 찾아 투자사·컨택을 자동 채움 */}
       <div className="space-y-1.5">
@@ -221,7 +267,10 @@ export function InvestorPicker({
             name="investor_id"
             required
             value={investorId || undefined}
-            onValueChange={setInvestorId}
+            onValueChange={(v) => {
+              setInvestorId(v);
+              setAliasCandidate(""); // 수동으로 다른 투자사를 고르면 별칭 후보 무효화
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="투자사 선택" />
@@ -241,19 +290,51 @@ export function InvestorPicker({
             </SelectContent>
           </Select>
         ) : (
-          <Input
-            name="investor_name"
-            placeholder="투자사명"
-            required
-            value={investorName}
-            onChange={(e) => setInvestorName(e.target.value)}
-          />
+          <div className="space-y-1.5">
+            <Input
+              name="investor_name"
+              placeholder="투자사명"
+              required
+              value={investorName}
+              onChange={(e) => handleInvestorName(e.target.value)}
+            />
+            {invMatches.length > 0 && (
+              <div className="rounded-lg border border-input bg-muted/30 p-1.5">
+                <p className="px-1 pb-1 text-[11px] text-muted-foreground">
+                  이미 등록된 투자사일 수 있어요 — 골라서 연결하면 한 라벨로 모입니다.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {invMatches.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => handlePickInvestor(m)}
+                      className="rounded-full border border-border bg-card px-2.5 py-0.5 text-xs hover:border-primary hover:text-primary"
+                      title={m.via ? `별칭 ‘${m.via}’ 일치` : undefined}
+                    >
+                      {m.name}
+                      {m.via && (
+                        <span className="ml-1 text-muted-foreground">
+                          ({m.via})
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </Field>
 
-      {/* 새 투자사 상세 — 등록 모드에서만 */}
-      {mode === "new" && (
-        <div className="space-y-4 rounded-lg border border-border p-3">
+      {/* 투자사 상세 — 신규 등록 시 입력, 기존 선택 시 컨택·조합 추가(+빈 값 보강) */}
+      <div className="space-y-4 rounded-lg border border-border p-3">
+        {mode === "existing" && (
+          <p className="text-xs text-muted-foreground">
+            컨택 심사역·조합은 이 투자사에 새로 추가됩니다. 유형·일자·개요 메모는
+            기존 값이 비어 있을 때만 채워집니다.
+          </p>
+        )}
           <div className="grid grid-cols-2 gap-4">
             <Field label="유형">
               <input type="hidden" name="investor_type" value={investorType} />
@@ -399,7 +480,6 @@ export function InvestorPicker({
             ))}
           </div>
         </div>
-      )}
     </div>
   );
 }

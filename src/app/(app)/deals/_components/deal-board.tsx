@@ -14,6 +14,9 @@ import {
 } from "@dnd-kit/core";
 import { ArrowRight, Bookmark, CalendarPlus, FileUp, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { createClient } from "@/lib/supabase/client";
 
 import {
   DEAL_STAGES,
@@ -119,6 +122,7 @@ export function DealBoard({
   listingFundMap: Record<string, string[]>;
   listingBundles: ListingBundle[];
 }) {
+  const router = useRouter();
   const [deals, setDeals] = useState(initialDeals);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -136,6 +140,34 @@ export function DealBoard({
   useEffect(() => {
     setDeals(initialDeals);
   }, [initialDeals]);
+
+  // 공동작업 실시간 동기화 — 다른 팀원이 딜을 옮기거나 만들면 보드를 새로고침한다.
+  // (Supabase Realtime: deals / deal_stage_events 변경 구독 → 디바운스 router.refresh)
+  useEffect(() => {
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const bump = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => router.refresh(), 400);
+    };
+    const channel = supabase
+      .channel("deals-board")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "deals" },
+        bump,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "deal_stage_events" },
+        bump,
+      )
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [router]);
 
   useEffect(() => {
     try {
@@ -689,6 +721,11 @@ function DealCardView({
                 >
                   {ev.stage}
                 </span>
+                {ev.mover && (
+                  <span className="shrink-0 truncate text-muted-foreground/70">
+                    {ev.mover.first_name ?? ev.mover.name}
+                  </span>
+                )}
                 <span className="shrink-0 tabular-nums text-muted-foreground">
                   {formatShortDate(ev.changed_at)}
                 </span>

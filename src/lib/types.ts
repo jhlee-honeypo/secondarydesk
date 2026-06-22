@@ -294,6 +294,9 @@ export type Deal = {
 export type DealStageEvent = {
   stage: DealStage;
   changed_at: string;
+  changed_by: string | null;
+  // 단계를 옮긴 사람(공동작업 시 "누가 옮겼는지" 표시용). 조인 실패 시 null.
+  mover: { name: string | null; first_name: string | null } | null;
 };
 
 // 칸반 카드/목록용 — 매물·투자사·담당자 이름 + 단계 이력 조인 임베드

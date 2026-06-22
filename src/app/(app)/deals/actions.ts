@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import {
+  enrichExistingInvestor,
+  findInvestorByNorm,
+  recordAlias,
+  searchInvestorMatches,
+  type InvestorMatch,
+} from "@/lib/investor-aliases";
 import { DEAL_STAGES, type DealStage } from "@/lib/types";
 
 export type ActionResult =
@@ -42,6 +49,12 @@ function entryText(v: FormDataEntryValue | undefined): string | null {
   return t === "" ? null : t;
 }
 
+// 정규명 또는 별칭이 검색어를 포함하는 투자사 후보(딜 폼의 실시간 제안용).
+export async function searchInvestors(query: string): Promise<InvestorMatch[]> {
+  const supabase = await createClient();
+  return searchInvestorMatches(supabase, query);
+}
+
 // 딜 생성 시 "새 투자사 등록" 모드 → 투자사(+컨택+조합) 생성 후 id 반환.
 // 투자사 폼(InvestorFormDialog)의 등록 로직을 딜 생성에 일원화한 것.
 async function createInvestorInline(
@@ -52,21 +65,30 @@ async function createInvestorInline(
   const name = requiredText(fd, "investor_name");
   if (!name) return { error: "투자사명을 입력하세요." };
 
-  const { data: inserted, error } = await supabase
-    .from("investors")
-    .insert({
-      name,
-      type: text(fd, "investor_type"),
-      description: text(fd, "investor_description"),
-      met_date: text(fd, "investor_met_date"),
-      owner_id: fallbackOwnerId, // 담당 = 딜 생성자(계정) 자동
-    })
-    .select("id")
-    .single();
-  if (error || !inserted) {
-    return { error: error?.message ?? "투자사 등록에 실패했습니다." };
+  // 정규화가 일치하는 기존 투자사가 있으면 새로 만들지 않고 연결한다(라벨 분산 방지).
+  // 입력 표기가 정규명과 다르면 별칭으로 기록해 다음부터 검색·자동연결되게 한다.
+  let investorId: string;
+  const match = await findInvestorByNorm(supabase, name);
+  if (match) {
+    investorId = match.id;
+    await recordAlias(supabase, investorId, match.name, name, "deal");
+  } else {
+    const { data: inserted, error } = await supabase
+      .from("investors")
+      .insert({
+        name,
+        type: text(fd, "investor_type"),
+        description: text(fd, "investor_description"),
+        met_date: text(fd, "investor_met_date"),
+        owner_id: fallbackOwnerId, // 담당 = 딜 생성자(계정) 자동
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
+      return { error: error?.message ?? "투자사 등록에 실패했습니다." };
+    }
+    investorId = inserted.id as string;
   }
-  const investorId = inserted.id as string;
 
   // 컨택 심사역(이름이 있을 때만)
   const contactName = text(fd, "contact_name");
@@ -184,6 +206,21 @@ export async function createDeal(
   } else {
     investorId = requiredText(fd, "investor_id");
     if (!investorId) return { ok: false, error: "투자사를 선택하세요." };
+    // 변형 표기(명함 소속·수기 입력)로 후보를 골라 기존 투자사에 연결한 경우,
+    // 그 표기를 별칭으로 기록해 다음부터 같은 라벨로 검색·연결되게 한다.
+    const aliasCand = text(fd, "investor_alias_candidate");
+    if (aliasCand) {
+      const { data: inv } = await supabase
+        .from("investors")
+        .select("name")
+        .eq("id", investorId)
+        .single();
+      if (inv?.name) {
+        await recordAlias(supabase, investorId, inv.name as string, aliasCand, "deal");
+      }
+    }
+    // 기존 투자사에도 입력한 컨택·조합을 추가하고 빈 필드를 보강(덮어쓰기 없음).
+    await enrichExistingInvestor(supabase, investorId, fd);
   }
 
   const stageInput = text(fd, "stage");
@@ -524,12 +561,19 @@ export async function updateDeal(
   // 드랍 사유 칸은 단계가 '드랍'일 때만 폼에 있다. 필드가 제출됐을 때만 저장하고,
   // 없으면(드랍 외 단계) 기존 lost_reason 을 보존한다 — 단계를 바꿔도 사유 유지.
   const stageInput = text(fd, "stage");
-  const dealPayload: { stage?: DealStage; lost_reason?: string | null } = {
+  const dealPayload: {
+    stage?: DealStage;
+    lost_reason?: string | null;
+    owner_id?: string;
+  } = {
     stage: isStage(stageInput) ? stageInput : undefined,
   };
   if (fd.has("lost_reason")) {
     dealPayload.lost_reason = text(fd, "lost_reason");
   }
+  // 담당자 재지정(공동작업) — 폼에 owner_id 가 있으면 변경.
+  const newOwnerId = text(fd, "owner_id");
+  if (newOwnerId) dealPayload.owner_id = newOwnerId;
   const { data: dealRow, error: dealErr } = await supabase
     .from("deals")
     .update(dealPayload)

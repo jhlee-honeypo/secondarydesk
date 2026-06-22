@@ -16,7 +16,7 @@ export default async function DealsPage() {
   const dealsQuery = supabase
     .from("deals")
     .select(
-      "id, stage, next_action, next_action_date, investor_id, listing_id, lost_reason, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at)",
+      "id, stage, next_action, next_action_date, investor_id, listing_id, lost_reason, owner_id, listing:listings(id, company_name), investor:investors(id, name), owner:users(id, name, email, first_name), stage_events:deal_stage_events(stage, changed_at, changed_by, mover:users(name, first_name))",
     )
     .order("created_at", { ascending: false });
 

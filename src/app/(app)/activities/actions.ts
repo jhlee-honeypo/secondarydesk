@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
+import {
+  enrichExistingInvestor,
+  findInvestorByNorm,
+  recordAlias,
+} from "@/lib/investor-aliases";
 import { ACTIVITY_TYPES, type ActivityType } from "@/lib/types";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
@@ -39,21 +44,29 @@ async function createInvestorFromForm(
   const name = requiredText(fd, "investor_name");
   if (!name) return { error: "투자사명을 입력하세요." };
 
-  const { data: inserted, error } = await supabase
-    .from("investors")
-    .insert({
-      name,
-      type: text(fd, "investor_type"),
-      description: text(fd, "investor_description"),
-      met_date: text(fd, "investor_met_date") ?? metDateOverride,
-      owner_id: ownerId,
-    })
-    .select("id")
-    .single();
-  if (error || !inserted) {
-    return { error: error?.message ?? "투자사 등록에 실패했습니다." };
+  // 정규화가 일치하는 기존 투자사가 있으면 새로 만들지 않고 연결(라벨 분산 방지).
+  let investorId: string;
+  const match = await findInvestorByNorm(supabase, name);
+  if (match) {
+    investorId = match.id;
+    await recordAlias(supabase, investorId, match.name, name, "meeting");
+  } else {
+    const { data: inserted, error } = await supabase
+      .from("investors")
+      .insert({
+        name,
+        type: text(fd, "investor_type"),
+        description: text(fd, "investor_description"),
+        met_date: text(fd, "investor_met_date") ?? metDateOverride,
+        owner_id: ownerId,
+      })
+      .select("id")
+      .single();
+    if (error || !inserted) {
+      return { error: error?.message ?? "투자사 등록에 실패했습니다." };
+    }
+    investorId = inserted.id as string;
   }
-  const investorId = inserted.id as string;
 
   const contactName = text(fd, "contact_name");
   if (contactName) {
@@ -124,6 +137,20 @@ export async function logMeeting(
   } else {
     investorId = requiredText(fd, "investor_id");
     if (!investorId) return { ok: false, error: "투자사를 선택하세요." };
+    // 변형 표기로 기존 투자사에 연결했으면 그 표기를 별칭으로 기록.
+    const aliasCand = text(fd, "investor_alias_candidate");
+    if (aliasCand) {
+      const { data: inv } = await supabase
+        .from("investors")
+        .select("name")
+        .eq("id", investorId)
+        .single();
+      if (inv?.name) {
+        await recordAlias(supabase, investorId, inv.name as string, aliasCand, "meeting");
+      }
+    }
+    // 기존 투자사에도 입력한 컨택·조합을 추가하고 빈 필드를 보강(덮어쓰기 없음).
+    await enrichExistingInvestor(supabase, investorId, fd);
   }
 
   const { error } = await supabase.from("activities").insert({

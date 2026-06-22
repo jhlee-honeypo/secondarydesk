@@ -455,6 +455,8 @@ export function DealFormDialog({
   deal,
   listings,
   investors,
+  users,
+  currentUserId,
   lockListingId,
   lockInvestorId,
   holdingFunds,
@@ -506,6 +508,11 @@ export function DealFormDialog({
   // 단계: 제어형 Select + hidden input (Radix Select 의 숨은 폼 컨트롤이
   // 드롭다운을 닫으면 값을 유실할 수 있어 명시적 hidden input 으로 제출).
   const [stage, setStage] = useState<string>(deal?.stage ?? "컨택");
+
+  // 담당자(수정 모드에서 재지정 가능) — 기본값은 딜의 현재 담당, 없으면 나.
+  const [ownerId, setOwnerId] = useState<string>(
+    deal?.owner_id ?? currentUserId,
+  );
 
   // 생성 시 "단계 진입 일자"(=카드의 컨택일자) — 기본값은 새 투자사 '만난 일자'를
   // 따라간다. 사용자가 단계 일자를 직접 바꾸면(touched) 그 값으로 고정된다.
@@ -704,6 +711,27 @@ export function DealFormDialog({
                 defaultValue={deal?.lost_reason ?? ""}
                 placeholder="예: 펀드 부적합(시리즈 C 이상 선호), 농식품 비선호 등"
               />
+            </Field>
+          )}
+
+          {isEdit && (
+            <Field
+              label="담당자"
+              hint="이 딜을 맡은 담당 심사역. 다른 팀원에게 이관할 수 있습니다."
+            >
+              <input type="hidden" name="owner_id" value={ownerId} />
+              <Select value={ownerId || undefined} onValueChange={setOwnerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="담당자 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name ?? u.email ?? u.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           )}
 

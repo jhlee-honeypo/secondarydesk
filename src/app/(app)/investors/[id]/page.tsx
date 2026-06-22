@@ -163,6 +163,7 @@ export default async function InvestorDetailPage({
             }
             title="투자사를 삭제할까요?"
             description="이 투자사와 소속 조합·컨택·딜·활동이 모두 함께 삭제됩니다. 되돌릴 수 없습니다."
+            confirmText={investor.name}
             action={deleteInvestor.bind(null, investor.id)}
           />
         </div>
