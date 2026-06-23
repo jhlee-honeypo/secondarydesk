@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   Building2,
   Calculator,
   Compass,
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/guide", label: "알아보기", icon: Compass, ready: true },
   { href: "/", label: "대시보드", icon: LayoutDashboard, ready: true },
   { href: "/deals", label: "딜 보드", icon: KanbanSquare, ready: true },
+  { href: "/activities", label: "미팅 기록", icon: Activity, ready: true },
   { href: "/investors", label: "투자사", icon: Building2, ready: true },
   { href: "/associations", label: "조합 탐색", icon: Search, ready: true },
   { href: "/listings", label: "매물", icon: Package, ready: true },

@@ -26,7 +26,6 @@ import { ContactFormDialog } from "../_components/contact-form-dialog";
 import { DeleteDialog } from "@/components/app/delete-dialog";
 import { DealFormDialog } from "../../deals/_components/deal-form-dialog";
 import { deleteDeal } from "../../deals/actions";
-import { ActivityFormDialog } from "../../activities/_components/activity-form-dialog";
 import { ActivityTimeline } from "../../activities/_components/activity-timeline";
 import { deleteContact, deleteFund, deleteInvestor } from "../actions";
 
@@ -102,11 +101,6 @@ export default async function InvestorDetailPage({
   };
 
   const activities = (activityRows ?? []) as ActivityCard[];
-  const activityContacts = contacts.map((c) => ({ id: c.id, name: c.name }));
-  const activityDeals = deals.map((d) => ({
-    id: d.id,
-    label: d.listing?.company_name ?? "딜",
-  }));
 
   // 조합 결성약정총액 합
   const aumSum = funds.reduce((s, f) => s + (f.aum ?? 0), 0);
@@ -551,27 +545,14 @@ export default async function InvestorDetailPage({
         )}
       </section>
 
-      {/* 활동 */}
+      {/* 미팅 기록 — 이 투자사의 미팅·활동 이력(읽기 전용). 기록은 '미팅 기록' 메뉴/딜 보드에서. */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight">
-            활동 타임라인{" "}
-            <span className="text-sm font-normal text-muted-foreground">
-              ({activities.length})
-            </span>
-          </h2>
-          <ActivityFormDialog
-            investorId={investor.id}
-            contacts={activityContacts}
-            deals={activityDeals}
-            trigger={
-              <Button size="sm">
-                <Plus />
-                활동 기록
-              </Button>
-            }
-          />
-        </div>
+        <h2 className="text-base font-semibold tracking-tight">
+          미팅 기록{" "}
+          <span className="text-sm font-normal text-muted-foreground">
+            ({activities.length})
+          </span>
+        </h2>
         <ActivityTimeline activities={activities} investorId={investor.id} />
       </section>
     </div>

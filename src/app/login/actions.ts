@@ -27,7 +27,7 @@ export async function login(
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect("/guide");
 }
 
 /** 로그아웃 후 로그인 화면으로. */

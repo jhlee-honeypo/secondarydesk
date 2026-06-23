@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 
 import {
@@ -55,6 +56,12 @@ export function MeetingLogDialog({
     FormData
   >(logMeeting, undefined);
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+
+  // 기록 성공 시 현재 화면(피드·딜 보드)을 갱신해 새 미팅이 바로 보이게 한다.
+  useEffect(() => {
+    if (state?.ok) router.refresh();
+  }, [state, router]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

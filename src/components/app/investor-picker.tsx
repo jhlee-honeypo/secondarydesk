@@ -156,6 +156,15 @@ export function InvestorPicker({
       ? investors.find((i) => normName(i.name) === normName(company))
       : undefined;
 
+    // 컨택·연락처는 두 경우 모두 채운다. 컨택 입력란은 기존/신규 모드 공통으로
+    // 노출되고, 기존 투자사를 골라도 enrichExistingInvestor가 이 컨택을 추가한다.
+    setContactName(card.name);
+    setContactTitle(card.title ?? "");
+    setContactEmail(card.email ?? "");
+    setContactPhone(card.phone ?? "");
+    setContactLocked(true); // 명함 출처 연락처 잠금
+    if (showMetDate && card.met_date) onMetDateChange?.(card.met_date);
+
     if (matched) {
       setMode("existing");
       setInvestorId(matched.id);
@@ -165,12 +174,6 @@ export function InvestorPicker({
     } else {
       setMode("new");
       setInvestorName(company);
-      setContactName(card.name);
-      setContactTitle(card.title ?? "");
-      setContactEmail(card.email ?? "");
-      setContactPhone(card.phone ?? "");
-      setContactLocked(true); // 명함 출처 연락처 잠금
-      if (showMetDate && card.met_date) onMetDateChange?.(card.met_date);
       // 정확 일치는 없지만 유사 후보가 있을 수 있으니 제안 검색을 띄운다.
       handleInvestorName(company);
     }
