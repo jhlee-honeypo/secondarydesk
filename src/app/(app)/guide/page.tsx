@@ -32,7 +32,7 @@ const GUIDE: GuideSection[] = [
   {
     icon: LayoutDashboard,
     title: "대시보드",
-    href: "/",
+    href: "/dashboard",
     summary: "파이프라인 현황과 매물·투자사 진척을 한눈에 봅니다.",
     items: [
       "핵심 지표: 진행 중 딜 · 컨택 투자사 수 · 노출 매물/조합 기업 수 · 클로징 건수",

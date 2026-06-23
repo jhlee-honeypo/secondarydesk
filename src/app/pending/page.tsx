@@ -20,7 +20,7 @@ export default async function PendingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   // 이미 승인된 사용자는 앱으로
-  if (user.profile?.approved) redirect("/");
+  if (user.profile?.approved) redirect("/guide");
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">

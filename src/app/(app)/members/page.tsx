@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function MembersPage() {
   const me = await getCurrentUser();
   if (!me) redirect("/login");
-  if (me.profile?.role !== "lead") redirect("/");
+  if (me.profile?.role !== "lead") redirect("/guide");
 
   const supabase = await createClient();
   const { data } = await supabase

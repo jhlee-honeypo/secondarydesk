@@ -62,10 +62,10 @@ export async function updateSession(request: NextRequest) {
     return copyCookies(supabaseResponse, NextResponse.redirect(url));
   }
 
-  // 인증됨 + 로그인/가입 화면 → 홈으로 (승인 여부는 (app) 레이아웃에서 판정)
+  // 인증됨 + 로그인/가입 화면 → 알아보기로 (승인 여부는 (app) 레이아웃에서 판정)
   if (user && (pathname === "/login" || pathname === "/signup")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/guide";
     return copyCookies(supabaseResponse, NextResponse.redirect(url));
   }
 

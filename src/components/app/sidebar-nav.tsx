@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/guide", label: "알아보기", icon: Compass, ready: true },
-  { href: "/", label: "대시보드", icon: LayoutDashboard, ready: true },
+  { href: "/dashboard", label: "대시보드", icon: LayoutDashboard, ready: true },
   { href: "/deals", label: "딜 보드", icon: KanbanSquare, ready: true },
   { href: "/activities", label: "미팅 기록", icon: Activity, ready: true },
   { href: "/investors", label: "투자사", icon: Building2, ready: true },
@@ -62,7 +62,7 @@ export function SidebarNav({ isLead = false }: { isLead?: boolean }) {
         }
 
         const active =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+          pathname === href || pathname.startsWith(`${href}/`);
 
         return (
           <Link

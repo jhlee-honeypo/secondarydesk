@@ -37,7 +37,7 @@ export function DashboardFilters({
     if (value === ALL) params.delete(key);
     else params.set(key, value);
     const qs = params.toString();
-    router.push(qs ? `/?${qs}` : "/");
+    router.push(qs ? `/dashboard?${qs}` : "/dashboard");
   }
 
   return (
