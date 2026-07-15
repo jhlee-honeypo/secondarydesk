@@ -449,6 +449,82 @@ export async function getSlabFinancialReports(): Promise<SlabFinancialReport[]> 
   );
 }
 
+// ---- 법인등기부등본 — 회사별 최신 등기 파일 ------------------------------
+// 회사가 분기보고에 첨부한 `company register`(등기부등본 PDF)를 회사당 최신 1건으로
+// 추린다. 재무제표(getSlabFinancialReports)는 분기별로 다 싣지만, 등기부등본은
+// 설립일·본점이 사실상 불변이라 회사별 최신 1건이면 충분(백필 소스).
+
+export type SlabCorporateRegister = {
+  companyId: string; // sparkERP company _id (= corporate_registrations.bubble_company_id)
+  nameKr: string;
+  nameEn: string | null;
+  fileUrl: string; // 최신 등기부등본 CDN URL
+  fileName: string;
+  year: number;
+  quarter: string; // "1분기" 등 (어느 분기 보고에 붙었는지)
+};
+
+// 여러 첨부 중 파일명에 등기/register 가 있는 것을 우선, 없으면 첫 번째.
+function pickRegisterUrl(v: unknown): string | null {
+  const arr = Array.isArray(v)
+    ? (v as unknown[])
+    : v != null
+      ? [v]
+      : [];
+  const urls = arr.map(normCdnUrl).filter((u): u is string => Boolean(u));
+  if (urls.length === 0) return null;
+  return urls.find((u) => /등기|register/i.test(fileNameFromUrl(u))) ?? urls[0];
+}
+
+/** 등기부등본(`company register`)을 가진 모든 회사의 최신 1건. 백필 소스. */
+export async function getSlabCorporateRegisters(): Promise<
+  SlabCorporateRegister[]
+> {
+  const [companyRows, quarterRows] = await Promise.all([
+    fetchAll("company"),
+    fetchAll("quarterlyupdate"),
+  ]);
+
+  const nameById = new Map<string, { kr: string; en: string | null }>();
+  for (const c of companyRows) {
+    const id = String(c._id ?? "");
+    if (!id) continue;
+    nameById.set(id, {
+      kr: str(c["company name"]) ?? "(이름 없음)",
+      en: str(c["company name eng"]),
+    });
+  }
+
+  // 회사별로, 등기부등본 파일을 가진 분기 중 가장 최신(연도·분기) 1건만 남긴다.
+  const byCompany = new Map<string, SlabCorporateRegister>();
+  for (const r of quarterRows) {
+    const cid = str(r["company"]);
+    if (!cid) continue;
+    const url = pickRegisterUrl(r["company register"]);
+    if (!url) continue;
+    const year = nnum(r["year"]) ?? 0;
+    const quarter = str(r["quarter"]) ?? "";
+    const info = nameById.get(cid);
+    const item: SlabCorporateRegister = {
+      companyId: cid,
+      nameKr: info?.kr ?? "(이름 없음)",
+      nameEn: info?.en ?? null,
+      fileUrl: url,
+      fileName: fileNameFromUrl(url),
+      year,
+      quarter,
+    };
+    const prev = byCompany.get(cid);
+    const ord = (x: SlabCorporateRegister) =>
+      x.year * 10 + (QUARTER_ORD[x.quarter] ?? 0);
+    if (!prev || ord(item) >= ord(prev)) byCompany.set(cid, item);
+  }
+
+  return [...byCompany.values()].sort((a, b) =>
+    a.nameKr.localeCompare(b.nameKr, "ko"),
+  );
+}
+
 /** slab CDN 의 재무제표 파일(PDF·이미지·엑셀)을 받아 bytes 로 반환(추출 입력용). */
 export async function fetchSlabFile(
   url: string,

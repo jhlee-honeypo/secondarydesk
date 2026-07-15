@@ -396,6 +396,27 @@ export type FinancialStatement = {
   updated_at: string;
 };
 
+// 법인등기부등본 추출 스냅샷 (회사당 1행)
+export type CorporateRegistration = {
+  id: string;
+  company_name: string;
+  company_name_en: string | null;
+  bubble_company_id: string | null;
+  established_date: string | null;
+  head_office_address: string | null;
+  head_office_city: string | null;
+  issue_date: string | null;
+  total_issued_shares: number | null;
+  shares_by_type: { type: string; count: number }[];
+  shares_as_of_date: string | null;
+  source: "upload" | "slab";
+  source_file: string | null;
+  source_file_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // 단계별 배지/컬럼 강조 색상 (클로징=성사, 드랍=중단)
 export const DEAL_STAGE_VARIANT: Record<
   DealStage,

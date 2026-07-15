@@ -11,6 +11,7 @@ import {
   Landmark,
   LayoutDashboard,
   Package,
+  ScrollText,
   Search,
   Stethoscope,
   Users,
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { href: "/funds", label: "운용펀드", icon: Landmark, ready: true },
   { href: "/exit-scenario", label: "EXIT Simulator", icon: Calculator, ready: true },
   { href: "/financials", label: "재무 점검", icon: Stethoscope, ready: true },
+  { href: "/registrations", label: "등기 정보", icon: ScrollText, ready: true },
 ];
 
 // lead(관리자) 전용 항목
