@@ -12,6 +12,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // 정적 자산·이미지·favicon 을 제외한 모든 경로에서 실행 (인증은 전 경로 권장).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|html)$).*)",
   ],
 };
