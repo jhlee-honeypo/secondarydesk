@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ko" data-theme="auto">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>slab-bot 데이터 모델 — 계층 피라미드</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f2f1ec;
+    --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --good:#0ca30c; --good-text:#006300; --critical:#d03b3b;
+    --warn-text:#8a5a00; --warn-bg:#fab219;
+    --base:#1baf7a;   /* 하단 = 아쿠아 */
+    --added:#eb6834;  /* 중단 = 오렌지 */
+    --info:#2a78d6;   /* Exit = 청 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root[data-theme="auto"] {
+      color-scheme:dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+      --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --good:#0ca30c; --good-text:#0ca30c; --critical:#e66767;
+      --warn-text:#fab219; --warn-bg:#fab219;
+      --base:#199e70; --added:#d95926; --info:#3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme:dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232321;
+    --ink:#fff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --good:#0ca30c; --good-text:#0ca30c; --critical:#e66767;
+    --warn-text:#fab219; --warn-bg:#fab219;
+    --base:#199e70; --added:#d95926; --info:#3987e5;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif; line-height:1.5; font-size:15px; }
+  .wrap { max-width:1240px; margin:0 auto; padding:32px 24px 80px; }
+
+  header.top { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+  h1 { font-size:26px; margin:0 0 6px; letter-spacing:-0.01em; }
+  .subtitle { color:var(--ink-2); margin:0; max-width:780px; }
+  .theme-toggle { flex:none; border:1px solid var(--border); background:var(--surface);
+    color:var(--ink-2); border-radius:8px; padding:7px 12px; cursor:pointer; font:inherit; font-size:13px; }
+  .theme-toggle:hover { color:var(--ink); }
+
+  /* 범례 */
+  .legend { display:flex; flex-wrap:wrap; gap:16px 18px; margin:18px 0 4px; font-size:12.5px; color:var(--ink-2); align-items:center; }
+  .legend .item { display:inline-flex; align-items:center; gap:7px; }
+  .legend .sw { width:22px; height:12px; border-radius:3px; flex:none; }
+  .legend .sw.dash { background:transparent; border:1.5px dashed var(--muted); }
+  .legend .sep { width:1px; height:16px; background:var(--grid); }
+  .legend .lbl { color:var(--muted); font-size:11.5px; font-weight:600; }
+
+  /* ── 계층 피라미드 (아래 넓음 → 위 좁음) ── */
+  .pyramid { margin-top:24px; display:flex; flex-direction:column; align-items:center; gap:0; }
+  .tier { width:100%; position:relative; }
+  .tier.t-top   { width:66%; }
+  .tier.t-added { width:82%; }
+  .tier.t-base  { width:100%; }
+  .funnel { color:var(--muted); font-size:18px; line-height:1; margin:2px 0; text-align:center; width:100%; }
+  .funnel small { display:block; font-size:11px; letter-spacing:0.03em; margin-top:2px; }
+
+  .tier-box { border-radius:14px; padding:16px 18px 18px; background:var(--surface); border:1px solid var(--border); }
+  .tier.t-base  .tier-box { border-top:4px solid var(--base); }
+  .tier.t-added .tier-box { border-top:4px solid var(--added); }
+  .tier.t-top   .tier-box { border:1.5px dashed var(--muted); background:color-mix(in srgb, var(--surface) 88%, var(--muted) 12%); }
+
+  .tier-head { display:flex; align-items:baseline; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .tier-head .tt { font-size:16px; font-weight:650; letter-spacing:-0.01em; }
+  .tier-head .td { font-size:12.5px; color:var(--ink-2); }
+  .chip { font-size:11px; font-weight:700; letter-spacing:0.02em; border-radius:20px; padding:2px 10px; white-space:nowrap; }
+  .chip.impl  { color:var(--ink); background:color-mix(in srgb, var(--base) 20%, var(--surface)); }
+  .chip.impl2 { color:var(--ink); background:color-mix(in srgb, var(--added) 22%, var(--surface)); }
+  .chip.prop  { color:var(--ink-2); background:transparent; border:1.5px dashed var(--muted); }
+
+  .subhead { font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--muted); font-weight:700; margin:16px 0 10px; }
+  .subhead:first-of-type { margin-top:0; }
+
+  /* 테이블 카드 그리드 */
+  .cards { display:grid; gap:12px; }
+  .cards.base  { grid-template-columns:repeat(5,1fr); }
+  .cards.added { grid-template-columns:repeat(3,1fr); }
+  .cards.top   { grid-template-columns:repeat(3,1fr); }
+  .cards.cand  { grid-template-columns:repeat(3,1fr); }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 13px; }
+  .card .cn { font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .card .cn .raw { font-family:ui-monospace,"Cascadia Code",monospace; font-size:10.5px; font-weight:500; color:var(--muted); }
+  .card .meta { font-size:10.5px; color:var(--muted); margin:3px 0 2px; }
+  .card .src { font-size:10.5px; color:var(--ink-2); margin:7px 0 8px; line-height:1.4; }
+  .card .src b { color:var(--muted); font-weight:600; }
+  .card .fields { display:flex; flex-wrap:wrap; gap:4px; }
+  .f { font-size:10.5px; color:var(--ink-2); background:var(--surface-2); border-radius:5px; padding:2px 6px; line-height:1.35; }
+  .card.closed { opacity:0.72; }
+  .tagx { font-size:9.5px; font-weight:700; color:var(--critical); border:1px solid var(--critical); border-radius:4px; padding:0 4px; margin-left:auto; }
+
+  /* 수집 주기 배지 */
+  .cad { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; border-radius:5px; padding:1px 7px; margin-top:6px; white-space:nowrap; }
+  .cad.auto { color:var(--good-text); background:color-mix(in srgb, var(--good) 15%, var(--surface)); }
+  .cad.semi { color:var(--warn-text); background:color-mix(in srgb, var(--warn-bg) 20%, var(--surface)); }
+  .cad.once { color:var(--ink-2); background:var(--surface-2); border:1px solid var(--border); }
+  .cad-row { display:flex; }
+
+  /* 상단 상태 그룹 */
+  .stgroup .cn .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .stgroup.live .cn .dot { background:var(--good); }
+  .stgroup.exit .cn .dot { background:var(--info); }
+  .stgroup.wo   .cn .dot { background:var(--critical); }
+  .stgroup .cn .ico { font-size:12px; }
+  .stgroup.live .cn .ico { color:var(--good-text); }
+  .stgroup.exit .cn .ico { color:var(--info); }
+  .stgroup.wo   .cn .ico { color:var(--critical); }
+  .stgroup .cn .label { font-family:system-ui; font-size:13px; }
+  .stgroup .cn .code { font-family:system-ui; font-size:10.5px; color:var(--muted); font-weight:600; }
+
+  /* 하단 공급 각주 */
+  .feed { margin-top:20px; font-size:12.5px; color:var(--ink-2); background:var(--surface-2);
+    border-radius:10px; padding:12px 16px; display:flex; gap:10px; align-items:flex-start; }
+  .feed b { color:var(--ink); }
+  .feed .ar { color:var(--muted); font-weight:700; }
+
+  footer { margin-top:44px; padding-top:16px; border-top:1px solid var(--grid); color:var(--muted); font-size:12px; }
+  footer b { color:var(--ink-2); }
+
+  @media (max-width:1000px) {
+    .tier.t-base, .tier.t-added, .tier.t-top { width:100%; }
+    .cards.base { grid-template-columns:repeat(2,1fr); }
+    .cards.added, .cards.top, .cards.cand { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>slab-bot 데이터 모델 — 계층 피라미드</h1>
+      <p class="subtitle">봇이 답하는 데이터를 <b>구현 성숙도</b>로 3층 쌓기. 아래로 갈수록 넓은 기반(이미 가진 것),
+        위로 갈수록 좁은 확장(붙이면 좋은 것). 각 블록엔 <b>수집 방법 + 주기</b>를 표기했고,
+        <b>지속 데이터는 전부 자동 파이프라인</b>으로 설계했다.</p>
+    </div>
+    <button class="theme-toggle" id="themeBtn" type="button">◐ 테마</button>
+  </header>
+
+  <div class="legend">
+    <span class="item"><span class="sw" style="background:var(--base)"></span>기본 slab</span>
+    <span class="item"><span class="sw" style="background:var(--added)"></span>추가 붙인 DB</span>
+    <span class="item"><span class="sw dash"></span>미구현·제안</span>
+    <span class="sep"></span>
+    <span class="lbl">수집 주기</span>
+    <span class="item"><span class="cad auto">↻ 지속·자동</span></span>
+    <span class="item"><span class="cad semi">↻ 수동→자동목표</span></span>
+    <span class="item"><span class="cad once">① 1회성/미수집</span></span>
+  </div>
+
+  <div class="pyramid">
+
+    <!-- ── 상단(가장 좁음): 미구현·유망 DB ── -->
+    <div class="tier t-top">
+      <div class="tier-box">
+        <div class="tier-head">
+          <span class="tt">미구현 · 붙으면 좋은 DB</span>
+          <span class="chip prop">제안</span>
+          <span class="td">전방위 질문 대응용. 신규 수집이 아니라 아래층 원천을 추출·파생해 채운다.</span>
+        </div>
+
+        <div class="subhead">상태별 구조화 인텔 — 봇의 투자 포지션(보유중·회수·상각)과 직결</div>
+        <div class="cards top">
+          <div class="card stgroup live">
+            <div class="cn"><span class="dot"></span><span class="ico">●</span><span class="label">보유중</span><span class="code">Live</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="src"><b>수집:</b> 분기현황 diff + 하이라이트 자동 요약</div>
+            <div class="fields">
+              <span class="f">현재 상태</span><span class="f">주요 진척</span><span class="f">주요 리스크</span>
+              <span class="f">투자 유치</span><span class="f">주요 고객</span><span class="f">최근 KPI</span>
+              <span class="f">예정 마일스톤</span><span class="f">종합 건전성</span>
+            </div>
+          </div>
+          <div class="card stgroup exit">
+            <div class="cn"><span class="dot"></span><span class="ico">▲</span><span class="label">회수</span><span class="code">Exit</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 이벤트·자동</span></div>
+            <div class="src"><b>수집:</b> 회수 발생 시 투자내역·문서에서 자동 생성</div>
+            <div class="fields">
+              <span class="f">회수 요약</span><span class="f">회수 유형</span><span class="f">회수 금액</span>
+              <span class="f">투자배수(MOIC)</span><span class="f">내부수익률(IRR)</span><span class="f">전략적 사유</span>
+              <span class="f">핵심 교훈</span>
+            </div>
+          </div>
+          <div class="card stgroup wo">
+            <div class="cn"><span class="dot"></span><span class="ico">✕</span><span class="label">상각·감액</span><span class="code">Write-off</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 이벤트·자동</span></div>
+            <div class="src"><b>수집:</b> 상각 발생 시 문서·회고에서 자동 생성</div>
+            <div class="fields">
+              <span class="f">청산 요약</span><span class="f">실패 타임라인</span><span class="f">근본 원인</span>
+              <span class="f">회수 금액</span><span class="f">손실액</span><span class="f">핵심 교훈</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="subhead">확장 후보 DB — 전방위 질문의 구조적 공백(관계·시간축·니즈) 보강</div>
+        <div class="cards cand">
+          <div class="card">
+            <div class="cn">인터랙션 로그 <span class="raw">interaction_log</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">예: "3개월 미컨택 회사?" · 관계 온도 · 팔로업</div>
+            <div class="src"><b>수집:</b> 메일·Jandi 자동 추출(수기 최소 보강)</div>
+            <div class="fields">
+              <span class="f">날짜·유형</span><span class="f">참석자</span><span class="f">요약</span>
+              <span class="f">액션아이템</span><span class="f">다음스텝</span><span class="f">감정신호</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">인물·조직 <span class="raw">portfolio_people</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">예: "연쇄창업가 대표?" · 이사회 파견 · 인력 이탈</div>
+            <div class="src"><b>수집:</b> 등기·IR·메일 자동 추출(배경만 수기)</div>
+            <div class="fields">
+              <span class="f">이름·역할</span><span class="f">배경</span><span class="f">이사회</span>
+              <span class="f">입·퇴사</span><span class="f">명함 연결</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">관계 그래프 <span class="raw">relationships</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">예: "공동투자 VC?" · 포트폴리오간 시너지 · 고객사</div>
+            <div class="src"><b>수집:</b> IR·라운드·미팅 문서 자동 추출</div>
+            <div class="fields">
+              <span class="f">노드(회사·투자자·고객)</span><span class="f">엣지 유형</span><span class="f">출처</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">니즈·요청 보드 <span class="raw">open_needs</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">예: "지금 인재 필요한 곳?" · findExperts 능동 매칭</div>
+            <div class="src"><b>수집:</b> 분기현황 inquiries 자동 파싱 + 미팅</div>
+            <div class="fields">
+              <span class="f">니즈 유형</span><span class="f">긴급도</span><span class="f">상태</span><span class="f">매칭 결과</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">외부 시그널 <span class="raw">external_signals</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">예: "최근 보도된 회사?" · 시장 화제성 · 경쟁사 근황</div>
+            <div class="src"><b>수집:</b> 뉴스 API·웹 <b>크론 스크레이프(완전 자동)</b></div>
+            <div class="fields">
+              <span class="f">출처</span><span class="f">제목</span><span class="f">일자</span>
+              <span class="f">감성</span><span class="f">링크</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">벤치마크 뷰 <span class="raw">benchmarks</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동(파생)</span></div>
+            <div class="meta">예: "매출성장 상위 25%?" · 코호트 대비 위치</div>
+            <div class="src"><b>수집:</b> 원천 갱신 시 자동 재계산(저장 아님·파생 뷰)</div>
+            <div class="fields">
+              <span class="f">지표</span><span class="f">백분위</span><span class="f">코호트</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="funnel">△<small>추출·요약·파생</small></div>
+
+    <!-- ── 중단: 추가로 붙인 DB ── -->
+    <div class="tier t-added">
+      <div class="tier-box">
+        <div class="tier-head">
+          <span class="tt">추가로 붙인 DB</span>
+          <span class="chip impl2">구현됨</span>
+          <span class="td">외부 원천을 SecondaryDesk Supabase에 적재 · 회사 ID로 조인</span>
+        </div>
+        <div class="cards added">
+          <div class="card">
+            <div class="cn">법인등기 <span class="raw">corporate_registrations</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">147개사(533분기) · 조인키: 회사 ID</div>
+            <div class="src"><b>수집:</b> 분기 첨부 등기부 Claude 자동 추출(초기 백필 완료)</div>
+            <div class="fields">
+              <span class="f">설립등기일</span><span class="f">설립연도</span>
+              <span class="f">본점 시/도</span><span class="f">본점 주소</span>
+              <span class="f">발행주식총수</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">명함 <span class="raw">business_cards</span></div>
+            <div class="cad-row"><span class="cad semi">↻ 수동→자동목표</span></div>
+            <div class="meta">리멤버 ~9.8k · 전문가 매칭 · 개인정보(이메일·전화) 미노출</div>
+            <div class="src"><b>수집:</b> 리멤버 export 적재 <b>→ 정기 동기화 자동화 목표</b></div>
+            <div class="fields">
+              <span class="f">이름</span><span class="f">소속</span><span class="f">직함</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">운용조합 <span class="raw">holding_funds</span></div>
+            <div class="cad-row"><span class="cad semi">↻ 수동(저빈도)</span></div>
+            <div class="meta">조합명 매핑(slab 조합 API 닫힘 폴백) · 조인키: 조합 ID</div>
+            <div class="src"><b>수집:</b> SecondaryDesk 수기(조합 신설 시, 저빈도라 수기 유지)</div>
+            <div class="fields">
+              <span class="f">조합명</span><span class="f">약칭</span><span class="f">약정액</span>
+              <span class="f">빈티지</span><span class="f">만기일</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="funnel">△<small>조인·병합</small></div>
+
+    <!-- ── 하단(가장 넓음): 기본 slab (bubble.io) ── -->
+    <div class="tier t-base">
+      <div class="tier-box">
+        <div class="tier-head">
+          <span class="tt">기본 slab (bubble.io)</span>
+          <span class="chip impl">기반</span>
+          <span class="td">sparkERP 데이터 API · 온디맨드 조회</span>
+        </div>
+        <div class="cards base">
+          <div class="card">
+            <div class="cn">회사 <span class="raw">company</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">338개사</div>
+            <div class="src"><b>수집:</b> slab 입력 → Bubble API 자동 조회</div>
+            <div class="fields">
+              <span class="f">회사명(국/영)</span><span class="f">섹터</span><span class="f">존속상태</span>
+              <span class="f">주당가격</span><span class="f">발행주식수</span><span class="f">소속조합</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">분기현황 <span class="raw">quarterlyupdate</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">2,205행</div>
+            <div class="src"><b>수집:</b> 기업 분기 입력 → Bubble API 자동 조회</div>
+            <div class="fields">
+              <span class="f">연도·분기</span><span class="f">현금잔고</span><span class="f">런웨이</span>
+              <span class="f">번레이트·런레이트</span><span class="f">직원수</span><span class="f">펀딩 시리즈</span>
+              <span class="f">비즈니스 하이라이트</span><span class="f">재무제표 첨부</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">투자내역 <span class="raw">sparklabinvestment</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">스파크랩 투자</div>
+            <div class="src"><b>수집:</b> 심사역 입력 → Bubble API 자동 조회</div>
+            <div class="fields">
+              <span class="f">투자금액·주식수</span><span class="f">지분율</span><span class="f">투자상태</span>
+              <span class="f">주식종류</span><span class="f">회수금액</span><span class="f">회수배수</span>
+            </div>
+          </div>
+          <div class="card closed">
+            <div class="cn">조합 <span class="raw">fund</span> <span class="tagx">API 닫힘</span></div>
+            <div class="cad-row"><span class="cad once">① 미수집(권한 대기)</span></div>
+            <div class="meta">→ 운용조합으로 폴백</div>
+            <div class="src"><b>수집:</b> 권한 개방 시 Bubble API 자동</div>
+            <div class="fields">
+              <span class="f">조합명·약정액</span><span class="f">빈티지</span>
+            </div>
+          </div>
+          <div class="card closed">
+            <div class="cn">주식거래 <span class="raw">transaction</span> <span class="tagx">API 닫힘</span></div>
+            <div class="cad-row"><span class="cad once">① 미수집(권한 대기)</span></div>
+            <div class="meta">처분일 등</div>
+            <div class="src"><b>수집:</b> 권한 개방 시 Bubble API 자동</div>
+            <div class="fields">
+              <span class="f">거래일·유형</span><span class="f">주식수·단가</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="feed">
+    <span class="ar">↑</span>
+    <span><b>설계 원칙</b> — 지속 갱신 데이터는 <b>무조건 자동 파이프라인</b>으로: ①원천 입력→API 자동 동기화(기본 slab),
+      ②문서 자동 추출(등기·인물·관계·니즈), ③크론 스크레이프(외부 시그널), ④원천 갱신 시 자동 재계산(벤치마크 파생).
+      사람 손이 필요한 곳(명함·인터랙션 요약)도 <b>수기 최소화 + 자동 추출 우선</b>으로 좁힌다. 모든 값은 출처·신뢰도·권한 티어를 달고 답변 근거로 실린다.</span>
+  </div>
+
+  <footer>
+    slab-bot 데이터 모델(계층 피라미드) · 확장 설계 <b>docs/slab-bot-db-expansion.md</b> · 이벤트 카탈로그 <b>docs/slab-event-model.md</b> ·
+    코드 <b>C:\slab-chatbot</b> — 하단·중단은 현행 구현, 상단은 제안(팀 검토 후 스펙 분해).
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement, btn = document.getElementById('themeBtn');
+    var order = ['auto','light','dark'], label = { auto:'◐ 자동', light:'☀ 라이트', dark:'☾ 다크' };
+    function set(m){ root.setAttribute('data-theme', m); btn.textContent = label[m]; }
+    set('auto');
+    btn.addEventListener('click', function(){
+      var c = root.getAttribute('data-theme') || 'auto';
+      set(order[(order.indexOf(c)+1)%order.length]);
+    });
+  })();
+</script>
+</body>
+</html>
