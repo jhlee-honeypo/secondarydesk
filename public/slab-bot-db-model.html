@@ -99,6 +99,7 @@
   .f { font-size:10.5px; color:var(--ink-2); background:var(--surface-2); border-radius:5px; padding:2px 6px; line-height:1.35; }
   .card.closed { opacity:0.72; }
   .tagx { font-size:9.5px; font-weight:700; color:var(--critical); border:1px solid var(--critical); border-radius:4px; padding:0 4px; margin-left:auto; }
+  .tagok { font-size:9.5px; font-weight:700; color:var(--good-text); border:1px solid var(--good); border-radius:4px; padding:0 4px; margin-left:auto; }
 
   /* 수집 주기 배지 */
   .cad { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; border-radius:5px; padding:1px 7px; margin-top:6px; white-space:nowrap; }
@@ -203,8 +204,18 @@
           </div>
         </div>
 
-        <div class="subhead">확장 후보 DB — 전방위 질문의 구조적 공백(관계·시간축·니즈) 보강</div>
+        <div class="subhead">확장 후보 DB — 전방위 질문의 구조적 공백(관계·시간축·니즈) 보강 · 시간축은 타임라인으로 착수</div>
         <div class="cards cand">
+          <div class="card">
+            <div class="cn">타임라인·이벤트 <span class="raw">company_events</span> <span class="tagok">구현됨</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동(파생)</span></div>
+            <div class="meta">예: "최근 투자 유치한 회사?" · "런웨이 위험한 회사?"</div>
+            <div class="src"><b>수집:</b> 분기현황 연속 분기 diff → 이벤트 온디맨드 파생(저장 아님) · 도구 getCompanyTimeline·listRecentEvents</div>
+            <div class="fields">
+              <span class="f">ROUND 투자유치</span><span class="f">VALUATION 기업가치</span>
+              <span class="f">HEADCOUNT 직원수</span><span class="f">RUNWAY 런웨이</span>
+            </div>
+          </div>
           <div class="card">
             <div class="cn">인터랙션 로그 <span class="raw">interaction_log</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
