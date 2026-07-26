@@ -108,11 +108,18 @@ const NUM_FIELDS: { key: keyof ReviewRow; label: string }[] = [
   { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "rev_prev", label: "매출(전기)" },
   { key: "ni_prev", label: "당기순이익(전기)" },
+  { key: "cogs", label: "매출원가" },
+  { key: "operating_income", label: "영업이익" },
+  { key: "sga", label: "판매관리비" },
   { key: "cash", label: "현금" },
   { key: "savings", label: "보통예금" },
+  { key: "current_assets", label: "유동자산" },
+  { key: "current_liabilities", label: "유동부채" },
+  { key: "total_assets", label: "자산총계" },
+  { key: "total_liabilities", label: "부채총계" },
   { key: "total_equity", label: "자본총계" },
   { key: "capital", label: "자본금" },
-  { key: "sga", label: "판매관리비" },
+  { key: "retained_earnings", label: "이익잉여금(결손금)" },
 ];
 
 export function FinancialsClient() {

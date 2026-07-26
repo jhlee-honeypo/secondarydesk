@@ -382,6 +382,14 @@ export type FinancialStatement = {
   total_equity: number;
   capital: number;
   sga: number;
+  // Phase 1 확장 지표 (재추출 전 행/미포함 문서는 null)
+  cogs: number | null;
+  operating_income: number | null;
+  current_assets: number | null;
+  current_liabilities: number | null;
+  total_assets: number | null;
+  total_liabilities: number | null;
+  retained_earnings: number | null;
   source: "upload" | "slab";
   source_file: string | null;
   source_file_url: string | null;

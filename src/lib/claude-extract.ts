@@ -33,6 +33,13 @@ const SYSTEM_PROMPT = [
   "9. capital (number): 자본금 from 재무상태표 자본 section first line.",
   "10. month (number): report month - 3, 6, 9, or 12.",
   "11. sga (number): 판매비와관리비 from 손익계산서.",
+  "12. cogs (number): 매출원가 (매출원가/상품매출원가) current period from 손익계산서. If there is no 매출원가 line, set 0.",
+  "13. operatingIncome (number): 영업이익 current period (labels: 영업이익/영업손익/영업손실) from 손익계산서 (= 매출총이익 − 판매비와관리비). Loss is negative.",
+  "14. currentAssets (number): 유동자산 total (Ⅰ.유동자산) from 재무상태표.",
+  "15. currentLiabilities (number): 유동부채 total (Ⅰ.유동부채) from 재무상태표.",
+  "16. totalAssets (number): 자산총계 (자산총계/자산 총계) from 재무상태표.",
+  "17. totalLiabilities (number): 부채총계 (부채총계/부채 총계) from 재무상태표.",
+  "18. retainedEarnings (number): 이익잉여금 from 재무상태표 자본 section. SIGN RULE: a deficit (결손금/미처리결손금) is NEGATIVE — if the statement labels the line 결손금 and shows a positive magnitude, output it as a negative number. An 이익잉여금 already shown negative stays negative.",
   "",
   "RULES:",
   "- Missing value: use 0.",
@@ -40,8 +47,10 @@ const SYSTEM_PROMPT = [
   "- Loss (손실) is negative. Parenthesized numbers are negative.",
   "- CONSOLIDATED PRIORITY: If the document is a 연결재무제표/연결손익계산서 (consolidated) or shows both 별도(separate) and 연결(consolidated) figures, ALWAYS use the 연결(consolidated) figures (지배기업+종속기업 합산). Only fall back to 별도 figures when no consolidated figures exist.",
   "- No thousand separators in output.",
-  "- If document is only 재무상태표 (balance sheet), set revCurr/niCurr/revPrev/niPrev/sga to 0.",
-  "- If document is only 손익계산서 (income statement), set cash/savings/totalEquity/capital to 0.",
+  "- If document is only 재무상태표 (balance sheet), set revCurr/niCurr/revPrev/niPrev/sga/cogs/operatingIncome to 0.",
+  "- If document is only 손익계산서 (income statement), set cash/savings/totalEquity/capital/currentAssets/currentLiabilities/totalAssets/totalLiabilities/retainedEarnings to 0.",
+  "- For 재무상태표 items in a comparative statement (당기/전기 or 제N기/제N-1기 두 열), use the CURRENT period (당기 / most recent) column.",
+  "- SELF-CHECK (balance sheet): totalAssets must equal totalLiabilities + totalEquity. If they differ, re-read the statement.",
   "",
   "Submit via submit_financial_data tool.",
 ].join("\n");
@@ -63,6 +72,13 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       capital: { type: "number" },
       month: { type: "number" },
       sga: { type: "number" },
+      cogs: { type: "number" },
+      operatingIncome: { type: "number" },
+      currentAssets: { type: "number" },
+      currentLiabilities: { type: "number" },
+      totalAssets: { type: "number" },
+      totalLiabilities: { type: "number" },
+      retainedEarnings: { type: "number" },
     },
     required: [
       "companyName",
@@ -76,6 +92,13 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       "capital",
       "month",
       "sga",
+      "cogs",
+      "operatingIncome",
+      "currentAssets",
+      "currentLiabilities",
+      "totalAssets",
+      "totalLiabilities",
+      "retainedEarnings",
     ],
   },
 };
@@ -92,6 +115,13 @@ export type ExtractedFinancials = {
   capital: number;
   month: number;
   sga: number;
+  cogs: number;
+  operatingIncome: number;
+  currentAssets: number;
+  currentLiabilities: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  retainedEarnings: number;
 };
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -182,6 +212,13 @@ async function runExtraction(
         capital: num(d.capital),
         month: num(d.month),
         sga: num(d.sga),
+        cogs: num(d.cogs),
+        operatingIncome: num(d.operatingIncome),
+        currentAssets: num(d.currentAssets),
+        currentLiabilities: num(d.currentLiabilities),
+        totalAssets: num(d.totalAssets),
+        totalLiabilities: num(d.totalLiabilities),
+        retainedEarnings: num(d.retainedEarnings),
       };
     }
   }

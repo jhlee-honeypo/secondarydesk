@@ -28,6 +28,13 @@ export type ReviewRow = {
   total_equity: number;
   capital: number;
   sga: number;
+  cogs: number;
+  operating_income: number;
+  current_assets: number;
+  current_liabilities: number;
+  total_assets: number;
+  total_liabilities: number;
+  retained_earnings: number;
   source: "upload" | "slab";
   source_file: string | null;
   source_file_url: string | null;
@@ -80,6 +87,13 @@ function toRow(
     total_equity: d.totalEquity,
     capital: d.capital,
     sga: d.sga,
+    cogs: d.cogs,
+    operating_income: d.operatingIncome,
+    current_assets: d.currentAssets,
+    current_liabilities: d.currentLiabilities,
+    total_assets: d.totalAssets,
+    total_liabilities: d.totalLiabilities,
+    retained_earnings: d.retainedEarnings,
     source: base.source,
     source_file: base.source_file ?? null,
     source_file_url: base.source_file_url ?? null,
@@ -126,6 +140,13 @@ function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials {
     capital: pick((d) => d.capital),
     month: list.map((d) => d.month).find((m) => m > 0) ?? 0,
     sga: pick((d) => d.sga),
+    cogs: pick((d) => d.cogs),
+    operatingIncome: pick((d) => d.operatingIncome),
+    currentAssets: pick((d) => d.currentAssets),
+    currentLiabilities: pick((d) => d.currentLiabilities),
+    totalAssets: pick((d) => d.totalAssets),
+    totalLiabilities: pick((d) => d.totalLiabilities),
+    retainedEarnings: pick((d) => d.retainedEarnings),
   };
 }
 
@@ -152,6 +173,13 @@ function mergeRows(rows: ReviewRow[]): ReviewRow[] {
       total_equity: pickNonZero(prev.total_equity, r.total_equity),
       capital: pickNonZero(prev.capital, r.capital),
       sga: pickNonZero(prev.sga, r.sga),
+      cogs: pickNonZero(prev.cogs, r.cogs),
+      operating_income: pickNonZero(prev.operating_income, r.operating_income),
+      current_assets: pickNonZero(prev.current_assets, r.current_assets),
+      current_liabilities: pickNonZero(prev.current_liabilities, r.current_liabilities),
+      total_assets: pickNonZero(prev.total_assets, r.total_assets),
+      total_liabilities: pickNonZero(prev.total_liabilities, r.total_liabilities),
+      retained_earnings: pickNonZero(prev.retained_earnings, r.retained_earnings),
     });
   }
   return [...byKey.values()];
@@ -330,6 +358,13 @@ export async function saveFinancials(rows: ReviewRow[]): Promise<SaveResult> {
     total_equity: r.total_equity,
     capital: r.capital,
     sga: r.sga,
+    cogs: r.cogs,
+    operating_income: r.operating_income,
+    current_assets: r.current_assets,
+    current_liabilities: r.current_liabilities,
+    total_assets: r.total_assets,
+    total_liabilities: r.total_liabilities,
+    retained_earnings: r.retained_earnings,
     source: r.source,
     source_file: r.source_file,
     // 영구 보기 가능한 http(s) URL 만 저장(여러 개면 줄바꿈). blob: 등 임시 URL 제외.

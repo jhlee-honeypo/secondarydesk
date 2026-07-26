@@ -8,6 +8,10 @@
 //   런웨이     = 보유현금 / 월순소모          (소모 중일 때만, 개월)
 //   자본잠식률 = (자본금 − 자본총계) / 자본금
 //   매출성장률 = (매출당기 − 매출전기) / |매출전기|
+//   매출총이익률 = (매출 − 매출원가) / 매출
+//   영업이익률 = 영업이익 / 매출
+//   부채비율   = 부채총계 / 자본총계   (자본총계 > 0 일 때만)
+//   유동비율   = 유동자산 / 유동부채
 
 export type FinancialInput = {
   rev_curr: number;
@@ -20,6 +24,13 @@ export type FinancialInput = {
   capital: number;
   sga: number;
   report_month: number; // 3 / 6 / 9 / 12 (월평균 분모)
+  // Phase 1 확장 (선택 — 재추출 전 기존 행/미포함 문서와 호환되게 optional·nullable)
+  cogs?: number | null;
+  operating_income?: number | null;
+  current_assets?: number | null;
+  current_liabilities?: number | null;
+  total_assets?: number | null;
+  total_liabilities?: number | null;
 };
 
 export type FinancialMetrics = {
@@ -31,6 +42,10 @@ export type FinancialMetrics = {
   capitalErosion: number | null; // 자본잠식률 (자본금 0이면 null)
   isProfit: boolean; // 당기 흑자 여부
   revenueGrowth: number | null; // 매출성장률 (전기 0이면 null)
+  grossMargin: number | null; // 매출총이익률 (매출 0이면 null)
+  operatingMargin: number | null; // 영업이익률 (매출 0이면 null)
+  debtRatio: number | null; // 부채비율 (자본총계 ≤ 0이면 null)
+  currentRatio: number | null; // 유동비율 (유동부채 0이면 null)
 };
 
 export type HealthLevel = "danger" | "warning" | "good";
@@ -64,6 +79,18 @@ export function computeMetrics(i: FinancialInput): FinancialMetrics {
   const revenueGrowth =
     i.rev_prev !== 0 ? (i.rev_curr - i.rev_prev) / Math.abs(i.rev_prev) : null;
 
+  const grossMargin =
+    i.rev_curr !== 0 ? (i.rev_curr - (i.cogs ?? 0)) / i.rev_curr : null;
+  const operatingMargin =
+    i.rev_curr !== 0 ? (i.operating_income ?? 0) / i.rev_curr : null;
+  // 자본잠식(자본총계 ≤ 0)이면 부채비율은 의미 없음 → null (건전성은 자본잠식으로 별도 판정).
+  const debtRatio =
+    i.total_equity > 0 ? (i.total_liabilities ?? 0) / i.total_equity : null;
+  const currentRatio =
+    (i.current_liabilities ?? 0) !== 0
+      ? (i.current_assets ?? 0) / (i.current_liabilities ?? 0)
+      : null;
+
   return {
     heldCash,
     monthlyRevenue,
@@ -73,6 +100,10 @@ export function computeMetrics(i: FinancialInput): FinancialMetrics {
     capitalErosion,
     isProfit: i.ni_curr >= 0,
     revenueGrowth,
+    grossMargin,
+    operatingMargin,
+    debtRatio,
+    currentRatio,
   };
 }
 
@@ -128,3 +159,18 @@ export const HEALTH_LABEL: Record<HealthLevel, string> = {
   warning: "주의",
   good: "양호",
 };
+
+/** 재무상태표 정합 자기검증: 자산총계 = 부채총계 + 자본총계.
+ *  백필 품질 게이트용(등기 추출의 sharesConsistent 선례). 재무상태표가 없는
+ *  문서(손익계산서만)는 판정 불가(null). 반올림 오차 ±1원 허용. */
+export function isBalanceConsistent(i: {
+  total_assets?: number | null;
+  total_liabilities?: number | null;
+  total_equity: number;
+}): boolean | null {
+  const ta = i.total_assets ?? 0;
+  const tl = i.total_liabilities ?? 0;
+  const te = i.total_equity ?? 0;
+  if (ta === 0 && tl === 0 && te === 0) return null; // 재무상태표 미포함 → 판정 불가
+  return Math.abs(ta - (tl + te)) <= 1;
+}
