@@ -7,6 +7,7 @@ import {
   Building2,
   Calculator,
   Compass,
+  FileSpreadsheet,
   KanbanSquare,
   Landmark,
   LayoutDashboard,
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
   { href: "/funds", label: "운용펀드", icon: Landmark, ready: true },
   { href: "/exit-scenario", label: "EXIT Simulator", icon: Calculator, ready: true },
   { href: "/financials", label: "재무 점검", icon: Stethoscope, ready: true },
+  { href: "/financial-status", label: "재무 추출 현황", icon: FileSpreadsheet, ready: true },
   { href: "/registrations", label: "등기 정보", icon: ScrollText, ready: true },
 ];
 
