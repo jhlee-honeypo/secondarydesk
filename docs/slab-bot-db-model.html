@@ -42,6 +42,12 @@
     font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif; line-height:1.5; font-size:15px; }
   .wrap { max-width:1240px; margin:0 auto; padding:32px 24px 80px; }
 
+  /* 표기 공통 — .raw(원 테이블·필드명)와 code(도구·경로)는 문서 어디서나 같게 보인다.
+     아래 계층별 규칙은 크기만 덮어쓴다. */
+  .raw { font-family:ui-monospace,"Cascadia Code",monospace; font-size:10.5px; font-weight:500; color:var(--muted); }
+  code { font-family:ui-monospace,"Cascadia Code",monospace; font-size:11px;
+    background:var(--surface-2); border-radius:4px; padding:1px 5px; color:var(--ink-2); }
+
   header.top { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
   h1 { font-size:26px; margin:0 0 6px; letter-spacing:-0.01em; }
   .subtitle { color:var(--ink-2); margin:0; max-width:780px; }
@@ -88,6 +94,7 @@
   .cards.added { grid-template-columns:repeat(4,1fr); }
   .cards.top   { grid-template-columns:repeat(3,1fr); }
   .cards.cand  { grid-template-columns:repeat(3,1fr); }
+  .cards.ops   { grid-template-columns:repeat(2,1fr); }
 
   .card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 13px; }
   .card .cn { font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
@@ -100,6 +107,9 @@
   .card.closed { opacity:0.72; }
   .tagx { font-size:9.5px; font-weight:700; color:var(--critical); border:1px solid var(--critical); border-radius:4px; padding:0 4px; margin-left:auto; }
   .tagok { font-size:9.5px; font-weight:700; color:var(--good-text); border:1px solid var(--good); border-radius:4px; padding:0 4px; margin-left:auto; }
+  /* 어제(07-27) 열린 것 — 닫힘(tagx)과 대비되는 개방 표시 */
+  .tagopen { font-size:9.5px; font-weight:700; color:var(--ink); background:color-mix(in srgb, var(--good) 22%, var(--surface));
+    border:1px solid var(--good); border-radius:4px; padding:0 4px; margin-left:auto; }
 
   /* 수집 주기 배지 */
   .cad { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; border-radius:5px; padding:1px 7px; margin-top:6px; white-space:nowrap; }
@@ -132,7 +142,7 @@
   @media (max-width:1000px) {
     .tier.t-base, .tier.t-added, .tier.t-top { width:100%; }
     .cards.base { grid-template-columns:repeat(2,1fr); }
-    .cards.added, .cards.top, .cards.cand { grid-template-columns:1fr; }
+    .cards.added, .cards.top, .cards.cand, .cards.ops { grid-template-columns:1fr; }
   }
 
   /* ═══ 하단 증보: 우선순위 평가 (2026-07-27) ═══ */
@@ -194,6 +204,10 @@
   .callout ul { margin:8px 0 0; padding-left:18px; }
   .callout li { margin:3px 0; }
 
+  /* 평가 이후 해소된 항목 — 실측 기록은 지우지 않고 결말만 덧붙인다 */
+  .fix { color:var(--good-text); font-weight:600; }
+  .tag.done { color:var(--good-text); border:1px solid var(--good); background:transparent; font-weight:700; }
+
   .pri .raw { font-family:ui-monospace,"Cascadia Code",monospace; font-size:10.5px; font-weight:500; color:var(--muted); }
   .pri code { font-family:ui-monospace,"Cascadia Code",monospace; font-size:11px;
     background:var(--surface-2); border-radius:4px; padding:1px 5px; color:var(--ink-2); }
@@ -234,6 +248,20 @@
     <span class="item"><span class="cad once">① 1회성/미수집</span></span>
   </div>
 
+  <div class="callout" style="margin-top:20px">
+    <b>2026-07-27 갱신 — 무엇이 바뀌었나</b>
+    <ul>
+      <li><b>sparkERP가 privacy를 열었다</b> — 주식거래 <span class="raw">transaction</span> 737건(매각 93) · 조합 <span class="raw">fund</span> 22건.
+        <b>닫힘 카드 2장이 사라졌다.</b> 하단 §3에서 1위였던 <b>Exit 처분이력이 해소</b>됐다(도구 <code>listExits</code>).
+        단 <b>인수자는 필드 자체가 없어</b> 여전히 불가. 조합은 아직 봇이 폴백(운용조합)을 쓰고 있어 연동이 남았다.</li>
+      <li><b>운영 계측 테이블 2개 신설</b> — <span class="raw">bot_usage_events</span> · <span class="raw">bot_tool_calls</span>.
+        하단 §7이 "최우선 보완 장치"로 지목한 <b>잔디 경로 로깅 + 도구 호출 저장이 구현</b>됐다.</li>
+      <li><b>등기 신선도 노출</b> — 등기는 회사당 1행 스냅샷인데 기준일을 안 밝혀 4년 전 값과 비교해 '일치'라 답하고 있었다.
+        기준일·발급일을 실었고 등기↔slab 주식수 대조 도구(<code>compareIssuedShares</code>)를 붙였다.</li>
+      <li><b>행수 재실측</b>(2026-07-28) — 회사 338→<b>350</b> · 분기현황 2,205→<b>2,259</b> · 투자내역 <b>392</b> · 재무제표 150→<b>151개사</b>.</li>
+    </ul>
+  </div>
+
   <div class="pyramid">
 
     <!-- ── 상단(가장 좁음): 미구현·유망 DB ── -->
@@ -260,11 +288,12 @@
           <div class="card stgroup exit">
             <div class="cn"><span class="dot"></span><span class="ico">▲</span><span class="label">회수</span><span class="code">Exit</span></div>
             <div class="cad-row"><span class="cad auto">↻ 이벤트·자동</span></div>
-            <div class="src"><b>수집:</b> 회수 발생 시 투자내역·문서에서 자동 생성</div>
+            <div class="src"><b>수집:</b> 회수 발생 시 투자내역·문서에서 자동 생성.
+              <b>처분일·회수금액·배수는 07-27 구현</b>(주식거래 개방 + listExits) — 남은 것은 아래 서술 항목이다.
+              <b>인수자는 slab에 필드 자체가 없어</b> 문서 추출 없이는 불가</div>
             <div class="fields">
-              <span class="f">회수 요약</span><span class="f">회수 유형</span><span class="f">회수 금액</span>
-              <span class="f">투자배수(MOIC)</span><span class="f">내부수익률(IRR)</span><span class="f">전략적 사유</span>
-              <span class="f">핵심 교훈</span>
+              <span class="f">회수 요약</span><span class="f">회수 유형</span><span class="f">전략적 사유</span>
+              <span class="f">핵심 교훈</span><span class="f">내부수익률(IRR)</span>
             </div>
           </div>
           <div class="card stgroup wo">
@@ -359,24 +388,26 @@
         <div class="tier-head">
           <span class="tt">추가로 붙인 DB</span>
           <span class="chip impl2">구현됨</span>
-          <span class="td">외부 원천을 SecondaryDesk Supabase에 적재 · 회사 ID로 조인</span>
+          <span class="td">SecondaryDesk Supabase에 적재 — 포트폴리오 원천(회사 ID로 조인) + 봇 운영 계측</span>
         </div>
+        <div class="subhead">포트폴리오 원천 — 회사 ID로 조인</div>
         <div class="cards added">
           <div class="card">
             <div class="cn">법인등기 <span class="raw">corporate_registrations</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
-            <div class="meta">147개사(533분기) · 조인키: 회사 ID</div>
-            <div class="src"><b>수집:</b> 분기 첨부 등기부 Claude 자동 추출(초기 백필 완료)</div>
+            <div class="meta">147개사(533분기 스캔) · 조인키: 회사 ID · 회사당 <b>1행 스냅샷</b></div>
+            <div class="src"><b>수집:</b> 분기 첨부 등기부 Claude 자동 추출(초기 백필 완료). <b>기준일을 함께 노출</b> — 스냅샷이 최신 등기가 아닐 수 있어 '일치'는 그 시점 대비 무변동을 뜻한다</div>
             <div class="fields">
               <span class="f">설립등기일</span><span class="f">설립연도</span>
               <span class="f">본점 시/도</span><span class="f">본점 주소</span>
               <span class="f">발행주식총수</span>
+              <span class="f">주식수 기준일 136/147</span><span class="f">등기 발급일 147/147</span>
             </div>
           </div>
           <div class="card">
             <div class="cn">재무제표 <span class="raw">financial_statements</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
-            <div class="meta">150개사(분기 시계열) · 조인키: 회사 ID</div>
+            <div class="meta">151개사 170행 · 조인키: 회사 ID</div>
             <div class="src"><b>수집:</b> 분기 첨부 재무제표(감사·세무제출) Claude 자동 추출(백필 완료)</div>
             <div class="fields">
               <span class="f">매출·매출원가</span><span class="f">영업이익·순이익</span><span class="f">판관비</span>
@@ -396,11 +427,35 @@
           <div class="card">
             <div class="cn">운용조합 <span class="raw">holding_funds</span></div>
             <div class="cad-row"><span class="cad semi">↻ 수동(저빈도)</span></div>
-            <div class="meta">조합명 매핑(slab 조합 API 닫힘 폴백) · 조인키: 조합 ID</div>
+            <div class="meta">22행 · 조합명 매핑 · 조인키: 조합 ID · <b>폴백 사유 소멸</b>(slab <span class="raw">fund</span> 개방 → 원천 일원화 검토)</div>
             <div class="src"><b>수집:</b> SecondaryDesk 수기(조합 신설 시, 저빈도라 수기 유지)</div>
             <div class="fields">
               <span class="f">조합명</span><span class="f">약칭</span><span class="f">약정액</span>
               <span class="f">빈티지</span><span class="f">만기일</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="subhead">운영 계측 <span style="text-transform:none;letter-spacing:0;font-weight:600">— 포트폴리오 데이터가 아니라 <b>봇 자체의 사용 기록</b>. 하단 §7 보완장치를 구현한 것</span></div>
+        <div class="cards ops">
+          <div class="card">
+            <div class="cn">사용 계측 <span class="raw">bot_usage_events</span> <span class="tagok">07-27 신설</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 응답 생성 시 자동 적재</span></div>
+            <div class="meta"><b>웹·잔디 양쪽</b> 턴 단위 · service_role 전용(RLS 정책 없음) · 뷰 <code>/admin</code></div>
+            <div class="src"><b>수집:</b> <code>/api/chat</code> onFinish·onError, <code>/api/jandi</code> 반환값. 대화 이력은 도구·추론 파트를 버리므로 사후 재구성이 불가 → 생성 시점에 별도 적재</div>
+            <div class="fields">
+              <span class="f">채널(web·jandi)</span><span class="f">사용자·이메일</span><span class="f">질문 500자</span>
+              <span class="f">모델·상태·종료사유</span><span class="f">지연(ms)</span><span class="f">스텝 수</span>
+              <span class="f">토큰 4구간(미캐시·캐시읽기·캐시쓰기·출력)</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="cn">도구 호출 <span class="raw">bot_tool_calls</span> <span class="tagok">07-27 신설</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 응답 생성 시 자동 적재</span></div>
+            <div class="meta">턴당 다건 → 별행 · <code>created_at</code> 복제로 조인 없이 기간별 도구 순위 집계</div>
+            <div class="src"><b>수집:</b> 위 이벤트에 종속(<code>on delete cascade</code>). 이 계측으로 병목을 특정해 조합 질의를 70.9초→24.0초로 줄였다</div>
+            <div class="fields">
+              <span class="f">이벤트 ID</span><span class="f">도구명</span><span class="f">시각</span>
             </div>
           </div>
         </div>
@@ -421,7 +476,7 @@
           <div class="card">
             <div class="cn">회사 <span class="raw">company</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
-            <div class="meta">338개사</div>
+            <div class="meta">350개사</div>
             <div class="src"><b>수집:</b> slab 입력 → Bubble API 자동 조회</div>
             <div class="fields">
               <span class="f">회사명(국/영)</span><span class="f">섹터</span><span class="f">존속상태</span>
@@ -431,40 +486,42 @@
           <div class="card">
             <div class="cn">분기현황 <span class="raw">quarterlyupdate</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
-            <div class="meta">2,205행</div>
+            <div class="meta">2,259행</div>
             <div class="src"><b>수집:</b> 기업 분기 입력 → Bubble API 자동 조회</div>
             <div class="fields">
               <span class="f">연도·분기</span><span class="f">현금잔고</span><span class="f">런웨이</span>
               <span class="f">번레이트·런레이트</span><span class="f">직원수</span><span class="f">펀딩 시리즈</span>
-              <span class="f">비즈니스 하이라이트</span><span class="f">재무제표 첨부</span>
+              <span class="f">비즈니스 하이라이트</span><span class="f">재무제표 첨부</span><span class="f">제출일시</span>
             </div>
           </div>
           <div class="card">
             <div class="cn">투자내역 <span class="raw">sparklabinvestment</span></div>
             <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
-            <div class="meta">스파크랩 투자</div>
+            <div class="meta">392건 · 회수금액·배수의 <b>기준값</b>(거래 합산값과 어긋남)</div>
             <div class="src"><b>수집:</b> 심사역 입력 → Bubble API 자동 조회</div>
             <div class="fields">
               <span class="f">투자금액·주식수</span><span class="f">지분율</span><span class="f">투자상태</span>
               <span class="f">주식종류</span><span class="f">회수금액</span><span class="f">회수배수</span>
             </div>
           </div>
-          <div class="card closed">
-            <div class="cn">조합 <span class="raw">fund</span> <span class="tagx">API 닫힘</span></div>
-            <div class="cad-row"><span class="cad once">① 미수집(권한 대기)</span></div>
-            <div class="meta">→ 운용조합으로 폴백</div>
-            <div class="src"><b>수집:</b> 권한 개방 시 Bubble API 자동</div>
+          <div class="card">
+            <div class="cn">조합 <span class="raw">fund</span> <span class="tagopen">07-27 개방</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">22개 조합 · <b>봇 연동 대기</b>(현재도 운용조합 폴백 사용 중)</div>
+            <div class="src"><b>수집:</b> sparkERP privacy 개방 + 토큰 → Bubble API 자동 조회</div>
             <div class="fields">
-              <span class="f">조합명·약정액</span><span class="f">빈티지</span>
+              <span class="f">조합명·검색약칭</span><span class="f">조합규모·통화</span>
+              <span class="f">결성일</span><span class="f">만기일</span>
             </div>
           </div>
-          <div class="card closed">
-            <div class="cn">주식거래 <span class="raw">transaction</span> <span class="tagx">API 닫힘</span></div>
-            <div class="cad-row"><span class="cad once">① 미수집(권한 대기)</span></div>
-            <div class="meta">처분일 등</div>
-            <div class="src"><b>수집:</b> 권한 개방 시 Bubble API 자동</div>
+          <div class="card">
+            <div class="cn">주식거래 <span class="raw">transaction</span> <span class="tagopen">07-27 개방</span></div>
+            <div class="cad-row"><span class="cad auto">↻ 지속·자동</span></div>
+            <div class="meta">737건(이 중 매각 93건) · 도구 <b>listExits</b> · 인수자 필드 없음</div>
+            <div class="src"><b>수집:</b> sparkERP privacy 개방 + 토큰 → Bubble API 자동 조회. 날짜는 KST 캘린더로 보정</div>
             <div class="fields">
-              <span class="f">거래일·유형</span><span class="f">주식수·단가</span>
+              <span class="f">처분일(KST)</span><span class="f">거래유형·구분</span>
+              <span class="f">주식수</span><span class="f">거래단가</span><span class="f">거래대금</span>
             </div>
           </div>
         </div>
@@ -517,14 +574,17 @@
     <table>
       <thead><tr><th>질문 유형</th><th style="width:52px">건수</th><th>봇의 실제 결과</th></tr></thead>
       <tbody>
-        <tr><td><b>Exit 처분일·인수자</b></td><td class="n">6</td><td>⛔ "transactions 배열이 전부 비어 있음" · "매각 상대 확인 불가"</td></tr>
+        <tr><td><b>Exit 처분일·인수자</b></td><td class="n">6</td><td>⛔ "transactions 배열이 전부 비어 있음" · "매각 상대 확인 불가"
+          <br /><span class="fix">→ 2026-07-27 처분일 해소</span>(권한 개방 + <code>listExits</code>. 비마이프렌즈 = 2025-10-16·19.47억·7.79배).
+          <b>인수자는 slab에 필드가 없어 미해소.</b></td></tr>
         <tr><td><b>상장 여부</b></td><td class="n">2</td><td>⛔ 정형 필드 없음 → 본문 full-scan 추론. <b>오탐 발생</b>(경쟁사 상장을 자사로 집계). 1건은 응답이 빈 문자열</td></tr>
         <tr><td><b>폐업일·법인 상태</b></td><td class="n">1</td><td>⛔ "정확한 폐업 날짜는 시스템에 기록되어 있지 않습니다"</td></tr>
         <tr><td><b>감액 대상 검토</b></td><td class="n">2</td><td>⚠️ 재무(STEP3)만 커버. <b>STEP1·2 법적사건(부도·휴업·청산·압류·회생) 근거 전무</b></td></tr>
         <tr><td>인맥·전문가 매칭</td><td class="n">3</td><td>✅ findExperts</td></tr>
         <tr><td>등기 기반 속성</td><td class="n">3</td><td>✅ 등기 추출 트랙</td></tr>
         <tr><td>해외사업(일본)</td><td class="n">1</td><td>⚠️ 답은 나왔으나 337개사 본문 full-scan 추론</td></tr>
-        <tr><td>조합 목록</td><td class="n">1</td><td>✅ (단 "프론티어랩스" 검색 실패로 대화 1건 종료 — 등록명은 CJF)</td></tr>
+        <tr><td>조합 목록</td><td class="n">1</td><td>✅ (단 "프론티어랩스" 검색 실패로 대화 1건 종료 — 등록명은 CJF)
+          <br /><span class="fix">→ 07-27 조합 범위 오판정 수정</span>(조인 키 부재로 한글 회사명 어림 매칭 → id·소속조합 동봉). 별칭 사전은 미착수</td></tr>
       </tbody>
     </table>
 
@@ -533,8 +593,11 @@
       <table>
         <thead><tr><th>확인 사실</th><th>함의</th></tr></thead>
         <tbody>
-          <tr><td><code>transaction</code> 타입 <b>total = 0</b>(프라이버시 닫힘). 코드는 <code>getTransactionsByCompany</code>까지 <b>이미 완성</b></td><td>Exit 처분일·거래대금 = sparkERP 권한 해제 + 토큰. <b>코드 0줄</b></td></tr>
-          <tr><td><code>BUBBLE_API_TOKEN</code>이 빈 값 — 전부 익명 공개읽기 중</td><td>위의 전제</td></tr>
+          <tr><td><code>transaction</code> 타입 <b>total = 0</b>(프라이버시 닫힘). 코드는 <code>getTransactionsByCompany</code>까지 <b>이미 완성</b>
+            <br /><span class="fix">→ 07-27 개방. 737건(매각 93)</span></td><td>Exit 처분일·거래대금 = sparkERP 권한 해제 + 토큰. <b>코드 0줄</b> <span class="fix">— 예측대로였다</span></td></tr>
+          <tr><td><code>BUBBLE_API_TOKEN</code>이 빈 값 — 전부 익명 공개읽기 중
+            <br /><span class="fix">→ 07-27 토큰 발급</span>(익명 호출은 지금도 <code>transaction</code>·<code>fund</code> 를 0건으로 반환)</td><td>위의 전제</td></tr>
+          <tr><td><span class="fix">신규(07-28 실측)</span> <code>fund</code> 타입도 같이 열렸다 — <b>22건</b>, <code>fund name for search</code>(검색약칭)·<code>fund size</code>·결성/만기일 보유</td><td><b>조합 별칭사전(6위)의 원천이 확보</b>됐고 <code>holding_funds</code> 폴백의 존재 이유가 사라졌다 — 봇 연동은 미착수</td></tr>
           <tr><td><code>company.drive link</code> <b>96%</b>(323/337)</td><td>드라이브 인제스천의 선결과제 "회사↔파일 매핑"이 <b>이미 풀려 있음</b></td></tr>
           <tr><td><code>overseas location</code> 5% · <code>Existence of a domestic corporation or branch</code> 16% 존재</td><td>일본 질문은 신규 DB가 아니라 <b>기존 필드 미활용</b></td></tr>
           <tr><td><code>funding series</code> <b>2%</b> · <code>total amount raised</code> <b>2%</b> vs <code>any new funding round?</code> 28%</td><td>타임라인 ROUND 규칙이 2% 커버리지 필드에 의존 → <b>파생 28건은 과소집계</b></td></tr>
@@ -576,7 +639,9 @@
     <!-- ── 순위 ── -->
     <h3>3. 우선순위 결과</h3>
     <p class="lead" style="font-size:12.5px;">막대 길이 = 가중점수(0~100). 단일 계열이므로 색은 하나뿐이고,
-      <b>양식·성격은 색이 아니라 라벨</b>이 나른다.</p>
+      <b>양식·성격은 색이 아니라 라벨</b>이 나른다.
+      점수는 <b>07-27 평가 시점 그대로 보존</b>하고, 그 뒤 진행분만 <span class="tag done">✅ 완료</span>·<span class="tag done">◐ 부분</span> 라벨로 덧붙였다 —
+      평가의 예측력을 사후에 지우지 않기 위해서다.</p>
 
     <div class="rank">
       <div class="rrow">
@@ -584,8 +649,8 @@
         <div class="nm">Exit 처분이력</div>
         <div class="track"><div class="fill" style="width:99%"></div></div>
         <div class="sc">99</div>
-        <div class="rmeta"><span class="tag mode">정형 · tool</span><span class="tag">🔓 권한 개방</span>
-          <span class="tag">sparkERP <code>transaction</code> 프라이버시 해제 + 토큰 — <b>코드 이미 완성</b></span></div>
+        <div class="rmeta"><span class="tag mode">정형 · tool</span><span class="tag done">✅ 07-27 완료</span>
+          <span class="tag">권한 개방 + <code>listExits</code> — 예측대로 <b>신규 코드 최소</b>. 인수자만 미해소(필드 부재)</span></div>
       </div>
       <div class="rrow">
         <div class="no">1</div>
@@ -625,7 +690,8 @@
         <div class="track"><div class="fill" style="width:82%"></div></div>
         <div class="sc">82</div>
         <div class="rmeta"><span class="tag mode">정형 · tool</span><span class="tag">🔧 선결 트랙</span>
-          <span class="tag">22행. 사실상 즉시 — 조합 질의 전부의 전제</span></div>
+          <span class="tag">22행. 사실상 즉시 — 조합 질의 전부의 전제</span>
+          <span class="tag done">◐ 원천 확보(07-27 <code>fund</code> 개방)</span></div>
       </div>
       <div class="rrow">
         <div class="no">7</div>
@@ -712,7 +778,9 @@
     <table>
       <thead><tr><th>피라미드 상단 카드</th><th>이번 순위</th><th>비고</th></tr></thead>
       <tbody>
-        <tr><td>회수 <span class="raw">Exit</span> · 주식거래 <span class="raw">transaction</span></td><td class="n">1위</td><td>이미 카드로 있음. <b>권한만 열면 됨</b> — 신규 개발 아님</td></tr>
+        <tr><td>회수 <span class="raw">Exit</span> · 주식거래 <span class="raw">transaction</span></td><td class="n">1위</td><td>이미 카드로 있음. <b>권한만 열면 됨</b> — 신규 개발 아님.
+          <br /><span class="fix">→ 07-27 개방·구현 완료.</span> 카드가 상단(제안)에서 <b>하단(기반)으로 내려갔다</b>. 남은 것은 서술 항목(회수 요약·교훈)과, 필드 부재로 막힌 인수자</td></tr>
+        <tr><td>조합 <span class="raw">fund</span> <span class="raw">holding_funds</span></td><td>—</td><td><span class="fix">→ 07-27 <code>fund</code> 개방.</span> 수기 폴백의 존재 이유가 사라졌으나 봇은 아직 폴백을 쓴다 — <b>원천 일원화가 새 과제</b></td></tr>
         <tr><td>타임라인·이벤트 <span class="raw">company_events</span></td><td>—</td><td>✅ 구현 완료. 다만 ROUND 규칙이 2% 커버리지 필드 의존 → <b>규칙 재검토 권장</b></td></tr>
         <tr><td>인물·조직 <span class="raw">portfolio_people</span></td><td class="n">10위</td><td>실측 수요 낮음(findExperts가 일부 대체)</td></tr>
         <tr><td>인터랙션 로그 <span class="raw">interaction_log</span></td><td class="n">11위 / 탈락</td><td>메일=11위, 메신저=원천 미확보로 게이트 탈락</td></tr>
@@ -768,13 +836,16 @@
     <div class="callout">
       <ul>
         <li><b>표본 19건 · 2명 · 10일.</b> D·G 점수는 잠정치다.</li>
-        <li><b>잔디 경로는 이력을 저장하지 않는다</b> — 실사용의 상당 부분이 측정에서 빠졌을 수 있다.</li>
-        <li><b>도구 호출 파트가 저장되지 않는다</b> — 실패 판정을 답변 본문을 읽어 수동으로 했다.</li>
+        <li><b>잔디 경로는 이력을 저장하지 않는다</b> — 실사용의 상당 부분이 측정에서 빠졌을 수 있다.
+          <br /><span class="fix">→ 07-27 해소.</span> <span class="raw">bot_usage_events.channel</span> 이 <code>web</code>·<code>jandi</code> 를 함께 적재한다(잔디는 로그인이 없어 사용자 식별은 여전히 불가)</li>
+        <li><b>도구 호출 파트가 저장되지 않는다</b> — 실패 판정을 답변 본문을 읽어 수동으로 했다.
+          <br /><span class="fix">→ 07-27 해소.</span> <span class="raw">bot_tool_calls</span> 가 턴별 도구를 별행으로 남기고, 지연·스텝수·토큰 4구간도 함께 적재된다</li>
         <li>질문자 2명 모두 봇의 능력을 아는 상태였다 → <b>수요 억제</b> 가능성. 특히 맥락형 질문이 과소 측정됐을 수 있다.</li>
         <li><code>overseas operation</code>의 100% 채움률은 기본값일 가능성이 크다(실질 정보는 <code>overseas location</code> 5%).</li>
       </ul>
-      <b>보완 장치(최우선)</b> — 잔디 경로 로깅 + 도구 호출 파트 저장. 붙이면 D·G가 자동 재계산되어
-      이 표가 <b>추정이 아니라 계측으로</b> 유지된다.
+      <b>보완 장치(최우선) — <span class="fix">07-27 구현됨</span></b>. 잔디 경로 로깅 + 도구 호출 파트 저장을 붙였다(중단 티어 <b>운영 계측</b> 참조).
+      이제 D·G를 계측에서 재산출할 수 있으므로, <b>표본이 쌓이는 대로 이 표를 갱신</b>하면 된다 —
+      추정이 아니라 계측으로 유지된다. 단 <b>적재 시작 직후라 표본은 아직 얇다</b>(07-28 기준 7턴·288 도구호출).
     </div>
 
   </section>
@@ -783,6 +854,8 @@
     slab-bot 데이터 모델(계층 피라미드) · 확장 설계 <b>docs/slab-bot-db-expansion.md</b> · 이벤트 카탈로그 <b>docs/slab-event-model.md</b> ·
     코드 <b>C:\slab-chatbot</b> — 하단·중단은 현행 구현, 상단은 제안(팀 검토 후 스펙 분해).
     <br />하단 <b>우선순위 평가</b>(2026-07-27)는 질의 로그·필드 채움률 실측 기반 · 산출 <b>scripts/priority-score.mjs</b>.
+    <br /><b>최종 갱신 2026-07-28</b> — 07-27 DB 변경분 반영(주식거래·조합 권한 개방 · 운영 계측 테이블 신설 · 등기 스냅샷 기준일).
+    행수·채움률은 2026-07-28 Bubble Data API와 Supabase를 <b>직접 조회해 실측</b>했다.
   </footer>
 
 </div>
