@@ -212,7 +212,7 @@ export type SyncResult =
 
 /** ERP 조합 전체를 운용펀드(holding_funds)로 일괄 동기화.
  *  bubble_id 로 멱등 매칭(없으면 이름) — 기존 펀드는 약정액·결성연도·만기만 갱신,
- *  약칭·상태·메모는 보존. 신규 펀드는 추가. */
+ *  **명칭**·약칭·상태·메모는 보존. 신규 펀드는 추가. */
 export async function syncErpFunds(): Promise<SyncResult> {
   let funds: BubbleFund[];
   try {
@@ -243,8 +243,11 @@ export async function syncErpFunds(): Promise<SyncResult> {
   let updated = 0;
 
   for (const f of funds) {
-    const fields = {
-      name: f.name,
+    // ERP 사실값만 담는다 — 명칭(name)은 넣지 않는다.
+    // ERP 의 `fund name` 은 약칭("SKF3")이라, 기존 전체명("스파크랩 코리아 펀드 제3호")을
+    // 덮으면 조합 검색이 깨진다(slab-bot 의 조합 질의는 holding_funds.name 부분일치를 쓴다).
+    // erp-sync.ts 의 runErpSync 도 같은 규칙이다.
+    const facts = {
       commitment: f.size,
       vintage: f.startDate
         ? Number(isoToKstDate(f.startDate)?.slice(0, 4)) || null
@@ -254,14 +257,18 @@ export async function syncErpFunds(): Promise<SyncResult> {
     };
     const match = byBubbleId.get(f.id) ?? byName.get(norm(f.name));
     if (match) {
+      // 매칭된 기존 조합: 명칭·약칭·상태·메모는 보존하고 ERP 사실만 갱신.
       const { error } = await supabase
         .from("holding_funds")
-        .update(fields)
+        .update(facts)
         .eq("id", match.id);
       if (error) return { ok: false, error: error.message };
       updated++;
     } else {
-      const { error } = await supabase.from("holding_funds").insert(fields);
+      // 신규 조합만 ERP 코드를 명칭으로 넣어둔다(이후 수정 가능).
+      const { error } = await supabase
+        .from("holding_funds")
+        .insert({ ...facts, name: f.name });
       if (error) return { ok: false, error: error.message };
       created++;
     }
