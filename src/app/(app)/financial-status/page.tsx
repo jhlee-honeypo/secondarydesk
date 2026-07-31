@@ -3,6 +3,9 @@ import type { FinancialStatement } from "@/lib/types";
 import { getAllBubbleCompanies } from "@/lib/bubble";
 import { fundLabel } from "@/lib/format";
 import { Card } from "@/components/ui/card";
+// quarterIndex 는 lib 에서 가져온다 — 표 컴포넌트("use client")에서 import 하면
+// 서버 정렬에서 호출할 때 런타임 오류가 난다.
+import { quarterIndex } from "@/lib/financial-health";
 import {
   FinancialStatusTable,
   type FinStatusRow,
@@ -74,9 +77,16 @@ export default async function FinancialStatusPage() {
         quarterCount: countByCompany.get(c.companyId) ?? 0,
       };
     })
-    // 재무 있는 기업 먼저(이름순), "정보 없음"은 맨 하단(이름순)
+    // 최신 분기 자료가 위로. 기준 분기 색(파랑/앰버)과 순서를 맞춰, 최신분기 기업이
+    // 위에 모이고 뒤처진 기업일수록 아래로 내려가게 한다.
+    // ① 재무 있는 기업 먼저 → ② 기준 분기 최신순 → ③ 같은 분기면 이름순.
+    // "정보 없음"은 맨 하단(이름순).
     .sort((a, b) => {
       if (!!a.latest !== !!b.latest) return a.latest ? -1 : 1;
+      if (a.latest && b.latest) {
+        const diff = quarterIndex(b.latest) - quarterIndex(a.latest);
+        if (diff !== 0) return diff;
+      }
       return a.companyName.localeCompare(b.companyName, "ko");
     });
 

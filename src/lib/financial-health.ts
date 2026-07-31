@@ -174,3 +174,19 @@ export function isBalanceConsistent(i: {
   if (ta === 0 && tl === 0 && te === 0) return null; // 재무상태표 미포함 → 판정 불가
   return Math.abs(ta - (tl + te)) <= 1;
 }
+
+/**
+ * 분기를 연속된 정수 하나로(2026년 2분기 → 2026*4+2).
+ * 크기 비교와 '몇 분기 차이'를 같은 값으로 처리하려고 — 연·월을 따로 빼면
+ * 연도 경계에서 어긋난다.
+ *
+ * ⚠️ 이 함수는 서버 컴포넌트(목록 정렬)와 클라이언트 표(색 판정)가 함께 쓴다.
+ * "use client" 모듈에 두면 서버에서 호출할 때 런타임 오류가 난다
+ * (Attempted to call ... from the server but ... is on the client).
+ */
+export function quarterIndex(f: {
+  report_year: number;
+  report_month: number;
+}): number {
+  return f.report_year * 4 + f.report_month / 3;
+}

@@ -15,6 +15,7 @@ import {
   computeMetrics,
   gradeHealth,
   isBalanceConsistent,
+  quarterIndex,
   HEALTH_LABEL,
   type HealthLevel,
 } from "@/lib/financial-health";
@@ -47,6 +48,19 @@ function pctOrDash(v: number | null): string {
   return v === null ? "—" : `${(v * 100).toFixed(0)}%`;
 }
 
+// 기준 분기가 '지금 확보된 가장 최신 분기'인지에 따라 색을 나눈다.
+// 기준선은 달력이 아니라 데이터의 최댓값이다 — 분기보고는 마감 후 몇 주에 걸쳐
+// 올라오므로, 달력 기준으로 잡으면 아직 아무도 못 낸 분기가 기준이 되어 전부
+// '이전'으로 물든다.
+// 파랑=최신, 앰버=이전. 같은 표의 '자본잠식' 앰버 텍스트와 헷갈리지 않도록
+// 여기는 채운 알약(pill)으로 쓴다(색만이 아니라 형태로도 구분).
+const QUARTER_TONE = {
+  latest:
+    "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  older:
+    "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-100",
+} as const;
+
 export function FinancialStatusTable({
   rows,
   fundOptions,
@@ -58,6 +72,17 @@ export function FinancialStatusTable({
   const [fund, setFund] = useState("");
   const [onlyFin, setOnlyFin] = useState(false);
   const [onlyMismatch, setOnlyMismatch] = useState(false);
+
+  // 필터링 '전' 전체에서 최신 분기를 잡는다 — 필터를 걸 때마다 기준선이 움직이면
+  // 같은 회사가 조합 필터 유무에 따라 파랑↔앰버로 바뀌어 보인다.
+  const latestIdx = useMemo(
+    () =>
+      rows.reduce(
+        (max, r) => (r.latest ? Math.max(max, quarterIndex(r.latest)) : max),
+        0,
+      ),
+    [rows],
+  );
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -115,6 +140,23 @@ export function FinancialStatusTable({
           {filtered.length}
           {filtered.length !== rows.length && ` / ${rows.length}`}곳
         </span>
+
+        {/* 기준 분기 색 범례 — 색만 칠하고 뜻을 안 적으면 처음 보는 사람은 못 읽는다. */}
+        {latestIdx > 0 && (
+          <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            기준 분기
+            <span
+              className={`rounded-full px-2 py-0.5 font-medium ${QUARTER_TONE.latest}`}
+            >
+              최신
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 font-medium ${QUARTER_TONE.older}`}
+            >
+              이전
+            </span>
+          </span>
+        )}
       </div>
 
       <Card className="overflow-x-auto p-0">
@@ -184,9 +226,27 @@ export function FinancialStatusTable({
                 <tr key={r.companyId} className="border-b align-top last:border-0">
                   {nameCell}
                   <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                    {fin.report_year} {fin.report_month / 3}분기
+                    {(() => {
+                      // 색은 2단계(최신/이전)지만, 얼마나 뒤졌는지는 툴팁으로 알린다.
+                      const behind = latestIdx - quarterIndex(fin);
+                      const isLatest = behind === 0;
+                      return (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                            isLatest ? QUARTER_TONE.latest : QUARTER_TONE.older
+                          }`}
+                          title={
+                            isLatest
+                              ? "최신 분기 자료"
+                              : `이전 분기 자료 — 최신보다 ${behind}분기 뒤`
+                          }
+                        >
+                          {fin.report_year} {fin.report_month / 3}분기
+                        </span>
+                      );
+                    })()}
                     {r.quarterCount > 1 && (
-                      <span className="block text-[10px]">
+                      <span className="block pt-0.5 text-[10px]">
                         {r.quarterCount}개 분기
                       </span>
                     )}
