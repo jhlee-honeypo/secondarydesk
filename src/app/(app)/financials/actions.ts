@@ -10,6 +10,9 @@ import {
   type ExtractedFinancials,
 } from "@/lib/claude-extract";
 import { getSlabFinancialReports, fetchSlabFile } from "@/lib/bubble";
+// 병합·정규화 규칙은 크론 자동 적재(financial-sync)와 반드시 같아야 한다.
+// 두 경로가 갈리면 같은 PDF 가 화면과 크론에서 다른 값으로 저장된다.
+import { mergeExtracted, pickNonZero, safeDecode } from "@/lib/financial-sync";
 
 // 검토 표에 띄우는 추출 행(저장 전). 사용자가 수정 후 saveFinancials 로 확정.
 export type ReviewRow = {
@@ -105,48 +108,6 @@ function toRow(
     slab_total_raised: base.slab_total_raised ?? null,
     slab_highlight: base.slab_highlight ?? null,
     slab_head_count: base.slab_head_count ?? null,
-  };
-}
-
-function pickNonZero(a: number, b: number): number {
-  return a === 0 && b !== 0 ? b : a;
-}
-
-function safeDecode(u: string): string {
-  try {
-    return decodeURIComponent(u);
-  } catch {
-    return u;
-  }
-}
-
-// 한 분기에 여러 파일(재무상태표/손익계산서 분리 제출)을 각각 추출한 결과를
-// 한 건으로 병합(0이 아닌 값 우선). 회사명·보고월은 비어있지 않은 첫 값.
-function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials {
-  if (list.length <= 1) return list[0];
-  const pick = (sel: (d: ExtractedFinancials) => number) =>
-    list.reduce((acc, d) => pickNonZero(acc, sel(d)), 0);
-  return {
-    companyName:
-      list.map((d) => d.companyName).find((n) => n && n.toLowerCase() !== "unknown") ??
-      list[0].companyName,
-    revCurr: pick((d) => d.revCurr),
-    niCurr: pick((d) => d.niCurr),
-    revPrev: pick((d) => d.revPrev),
-    niPrev: pick((d) => d.niPrev),
-    cash: pick((d) => d.cash),
-    savings: pick((d) => d.savings),
-    totalEquity: pick((d) => d.totalEquity),
-    capital: pick((d) => d.capital),
-    month: list.map((d) => d.month).find((m) => m > 0) ?? 0,
-    sga: pick((d) => d.sga),
-    cogs: pick((d) => d.cogs),
-    operatingIncome: pick((d) => d.operatingIncome),
-    currentAssets: pick((d) => d.currentAssets),
-    currentLiabilities: pick((d) => d.currentLiabilities),
-    totalAssets: pick((d) => d.totalAssets),
-    totalLiabilities: pick((d) => d.totalLiabilities),
-    retainedEarnings: pick((d) => d.retainedEarnings),
   };
 }
 

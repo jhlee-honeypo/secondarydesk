@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/erp-sync",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/financial-sync",
+      "schedule": "30 19 * * *"
     }
   ]
 }
