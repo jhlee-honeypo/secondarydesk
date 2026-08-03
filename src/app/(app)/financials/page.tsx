@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/auth";
+import { getSlabCompanyContacts, getSlabFinancialReports } from "@/lib/bubble";
 import type { FinancialStatement } from "@/lib/types";
 import { fundLabel, formatWon, formatDate } from "@/lib/format";
 import {
@@ -13,6 +15,11 @@ import { cn } from "@/lib/utils";
 import { FinancialsClient } from "./_components/financials-client";
 import { FinancialsFilters } from "./_components/financials-filters";
 import { BoardFileViewer } from "./_components/board-file-viewer";
+import {
+  CompanyContactHover,
+  type CompanyContact,
+} from "./_components/company-contact";
+import { ListingMemos } from "./_components/listing-memos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Claude 추출 배치(서버 액션)용 여유 타임아웃
@@ -68,6 +75,55 @@ type ListingRow = {
   bubble_id: string | null;
 };
 
+// slab 분기보고 제출 현황(우리 DB 가 아니라 slab quarterlyupdate 가 원천).
+type Submission = {
+  reportMade: boolean;
+  shareholderList: boolean;
+  financialReport: boolean;
+  register: boolean;
+};
+const NO_SUBMISSION: Submission = {
+  reportMade: false,
+  shareholderList: false,
+  financialReport: false,
+  register: false,
+};
+
+function OX({ on }: { on: boolean }) {
+  return (
+    <span className={on ? "font-semibold text-emerald-600" : "font-semibold text-rose-500"}>
+      {on ? "O" : "X"}
+    </span>
+  );
+}
+
+function SubmissionCells({ sub }: { sub: Submission }) {
+  return (
+    <>
+      <td className="px-3 py-2 text-center">
+        {sub.reportMade ? (
+          <Badge variant="outline" className="text-[10px] text-emerald-600">
+            제출
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[10px] text-rose-500">
+            미제출
+          </Badge>
+        )}
+      </td>
+      <td className="px-3 py-2 text-center">
+        <OX on={sub.shareholderList} />
+      </td>
+      <td className="px-3 py-2 text-center">
+        <OX on={sub.financialReport} />
+      </td>
+      <td className="px-3 py-2 text-center">
+        <OX on={sub.register} />
+      </td>
+    </>
+  );
+}
+
 export default async function FinancialsPage({
   searchParams,
 }: {
@@ -109,7 +165,16 @@ export default async function FinancialsPage({
   const [selY, selM] = period ? period.split("-").map(Number) : [0, 0];
 
   // 선택한 조합의 매물 목록 + 각 매물에 매칭되는 재무 데이터(분기 지정 시 그 분기, 아니면 최신)
-  let roster: { listing: ListingRow; fin: FinancialStatement | null }[] = [];
+  let roster: {
+    listing: ListingRow;
+    fin: FinancialStatement | null;
+    sub: Submission;
+    contact: CompanyContact | null;
+    memoCount: number;
+  }[] = [];
+  // 제출 현황을 볼 분기 — 선택한 분기, 미선택이면 slab 의 최신 분기
+  let subY = selY;
+  let subM = selM;
 
   if (fund) {
     const { data: lf } = await supabase
@@ -119,7 +184,13 @@ export default async function FinancialsPage({
     const listingIds = (lf ?? []).map((r) => r.listing_id as string);
 
     if (listingIds.length > 0) {
-      const [{ data: listingRows }, { data: finRows }] = await Promise.all([
+      const [
+        { data: listingRows },
+        { data: finRows },
+        { data: memoRows },
+        slabReports,
+        slabContacts,
+      ] = await Promise.all([
         supabase
           .from("listings")
           .select("id, company_name, company_name_en, bubble_id")
@@ -130,7 +201,47 @@ export default async function FinancialsPage({
           .select("*")
           .order("report_year", { ascending: false })
           .order("report_month", { ascending: false }),
+        supabase.from("listing_memos").select("listing_id").in("listing_id", listingIds),
+        // slab 이 죽어도 재무 표는 떠야 하므로 실패 시 빈 배열(제출 현황만 전부 미제출로 표시)
+        getSlabFinancialReports().catch(() => []),
+        getSlabCompanyContacts().catch(() => []),
       ]);
+
+      const memoCountByListing = new Map<string, number>();
+      for (const m of memoRows ?? []) {
+        const k = m.listing_id as string;
+        memoCountByListing.set(k, (memoCountByListing.get(k) ?? 0) + 1);
+      }
+      const contactByBubble = new Map<string, CompanyContact>();
+      const contactByName = new Map<string, CompanyContact>();
+      for (const c of slabContacts) {
+        contactByBubble.set(c.companyId, c);
+        const n = normName(c.nameKr);
+        if (n && !contactByName.has(n)) contactByName.set(n, c);
+      }
+
+      if (!period) {
+        for (const r of slabReports) {
+          if (r.year * 100 + r.month > subY * 100 + subM) {
+            subY = r.year;
+            subM = r.month;
+          }
+        }
+      }
+      const subByBubble = new Map<string, Submission>();
+      const subByName = new Map<string, Submission>();
+      for (const r of slabReports) {
+        if (r.year !== subY || r.month !== subM) continue;
+        const s: Submission = {
+          reportMade: r.reportMade,
+          shareholderList: r.hasShareholderList,
+          financialReport: r.hasFile,
+          register: r.hasRegister,
+        };
+        subByBubble.set(r.companyId, s);
+        const n = normName(r.nameKr);
+        if (!subByName.has(n)) subByName.set(n, s);
+      }
 
       const byBubble = new Map<string, FinancialStatement>();
       const byName = new Map<string, FinancialStatement>();
@@ -143,13 +254,29 @@ export default async function FinancialsPage({
         if (!byName.has(n)) byName.set(n, f);
       }
 
-      roster = ((listingRows ?? []) as ListingRow[]).map((l) => ({
-        listing: l,
-        fin:
-          (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
-          byName.get(normName(l.company_name)) ??
-          null,
-      }));
+      roster = ((listingRows ?? []) as ListingRow[])
+        .map((l) => ({
+          listing: l,
+          fin:
+            (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
+            byName.get(normName(l.company_name)) ??
+            null,
+          sub:
+            (l.bubble_id ? subByBubble.get(l.bubble_id) : undefined) ??
+            subByName.get(normName(l.company_name)) ??
+            NO_SUBMISSION,
+          contact:
+            (l.bubble_id ? contactByBubble.get(l.bubble_id) : undefined) ??
+            contactByName.get(normName(l.company_name)) ??
+            null,
+          memoCount: memoCountByListing.get(l.id) ?? 0,
+        }))
+        // 분기보고 제출 기업이 상단, 미제출은 하단. 같은 그룹 안에서는 회사명순.
+        .sort(
+          (a, b) =>
+            Number(b.sub.reportMade) - Number(a.sub.reportMade) ||
+            a.listing.company_name.localeCompare(b.listing.company_name, "ko"),
+        );
     }
   }
 
@@ -165,6 +292,9 @@ export default async function FinancialsPage({
     good: graded.filter((g) => g.health === "good").length,
     none: roster.length - graded.length,
   };
+  const submitted = roster.filter((r) => r.sub.reportMade).length;
+  const subLabel = subY > 0 ? `${subY}년 ${subM / 3}분기` : "";
+  const me = await getCurrentUser();
 
   return (
     <div className="space-y-6">
@@ -172,7 +302,7 @@ export default async function FinancialsPage({
         <div>
           <h1 className="text-xl font-semibold">재무 점검</h1>
           <p className="text-sm text-muted-foreground">
-            조합을 선택하면 소속 매물의 재무상태를 점검합니다.
+            조합을 선택하면 소속 매물의 분기보고 제출 현황과 재무상태를 점검합니다.
           </p>
         </div>
         <FinancialsClient />
@@ -186,7 +316,14 @@ export default async function FinancialsPage({
           period={period}
         />
         {fund && (
-          <div className="flex gap-2 text-sm">
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Badge variant="outline" className="text-emerald-600">
+              분기보고 제출 {submitted}
+            </Badge>
+            <Badge variant="outline" className="text-rose-500">
+              미제출 {roster.length - submitted}
+            </Badge>
+            <span className="w-2" />
             <Badge variant="destructive">위험 {counts.danger}</Badge>
             <Badge variant="secondary">주의 {counts.warning}</Badge>
             <Badge variant="outline">양호 {counts.good}</Badge>
@@ -212,6 +349,15 @@ export default async function FinancialsPage({
               <tr>
                 <th className="px-3 py-2">상태</th>
                 <th className="px-3 py-2">회사</th>
+                <th className="px-3 py-2 text-center whitespace-nowrap">
+                  분기보고
+                  {subLabel && (
+                    <span className="block text-[10px] font-normal">{subLabel}</span>
+                  )}
+                </th>
+                <th className="px-3 py-2 text-center">주주명부</th>
+                <th className="px-3 py-2 text-center">재무제표</th>
+                <th className="px-3 py-2 text-center">등기부등본</th>
                 <th className="px-3 py-2">기준</th>
                 <th className="px-3 py-2 text-right">보유현금</th>
                 <th className="px-3 py-2 text-right">월평균매출</th>
@@ -223,10 +369,28 @@ export default async function FinancialsPage({
                 <th className="px-3 py-2">투자유치</th>
                 <th className="px-3 py-2 text-right">직원</th>
                 <th className="px-3 py-2">하이라이트</th>
+                <th className="px-3 py-2 text-center">메모</th>
               </tr>
             </thead>
             <tbody>
-              {roster.map(({ listing, fin }) => {
+              {roster.map(({ listing, fin, sub, contact, memoCount }) => {
+                const memoCell = (
+                  <td className="px-3 py-2 text-center">
+                    <ListingMemos
+                      listingId={listing.id}
+                      companyName={listing.company_name}
+                      count={memoCount}
+                      currentUserId={me?.id ?? null}
+                    />
+                  </td>
+                );
+                const companyCell = (
+                  <CompanyContactHover
+                    companyName={listing.company_name}
+                    companyNameEn={listing.company_name_en}
+                    contact={contact}
+                  />
+                );
                 if (!fin) {
                   // 데이터 미수집/미제출 — 회색 빈 행
                   return (
@@ -239,14 +403,8 @@ export default async function FinancialsPage({
                           데이터 없음
                         </Badge>
                       </td>
-                      <td className="px-3 py-2 font-medium">
-                        {listing.company_name}
-                        {listing.company_name_en && (
-                          <span className="block text-xs">
-                            {listing.company_name_en}
-                          </span>
-                        )}
-                      </td>
+                      <td className="px-3 py-2 font-medium">{companyCell}</td>
+                      <SubmissionCells sub={sub} />
                       <td className="px-3 py-2">—</td>
                       <td className="px-3 py-2 text-right">—</td>
                       <td className="px-3 py-2 text-right">—</td>
@@ -258,6 +416,7 @@ export default async function FinancialsPage({
                       <td className="px-3 py-2">—</td>
                       <td className="px-3 py-2 text-right">—</td>
                       <td className="px-3 py-2">—</td>
+                      {memoCell}
                     </tr>
                   );
                 }
@@ -270,14 +429,8 @@ export default async function FinancialsPage({
                         {HEALTH_LABEL[health.level]}
                       </Badge>
                     </td>
-                    <td className="px-3 py-2 font-medium">
-                      {listing.company_name}
-                      {listing.company_name_en && (
-                        <span className="block text-xs text-muted-foreground">
-                          {listing.company_name_en}
-                        </span>
-                      )}
-                    </td>
+                    <td className="px-3 py-2 font-medium">{companyCell}</td>
+                    <SubmissionCells sub={sub} />
                     <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                       {fin.report_year} · {fin.report_month / 3}분기
                       <span className="block text-[10px]">
@@ -348,6 +501,7 @@ export default async function FinancialsPage({
                         "—"
                       )}
                     </td>
+                    {memoCell}
                   </tr>
                 );
               })}

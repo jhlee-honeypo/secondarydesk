@@ -41,25 +41,49 @@ async function bubblePage(
 // 자동완성에 부적합 → 전체 레코드를 받아 메모리에서 부분문자열 필터한다.
 // fund(22)·company(338) 규모라 부담 적고, 모듈 캐시(TTL 5분)로 반복 요청 차단.
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map<string, { at: number; rows: Record<string, unknown>[] }>();
+// 값이 아니라 "진행 중인 프라미스"를 캐시한다. 한 렌더에서 여러 함수가 같은 타입을
+// 동시에 요청할 때(예: 재무 점검의 분기보고 + 연락처) 값 캐시는 아직 비어 있어
+// quarterlyupdate 23페이지를 두 번 긁게 된다 — 프라미스를 공유해 한 번만 받는다.
+const cache = new Map<
+  string,
+  { at: number; rows: Promise<Record<string, unknown>[]> }
+>();
 
-async function fetchAll(type: string): Promise<Record<string, unknown>[]> {
+const PAGE = 100;
+const MAX_ROWS = 5000; // 안전장치 — quarterlyupdate 가 2200건+ 이라 넉넉히 둔다
+const CONCURRENCY = 6;
+
+async function loadAll(type: string): Promise<Record<string, unknown>[]> {
+  // 첫 페이지의 remaining 으로 전체 건수를 알 수 있으므로, 커서를 하나씩 따라가는
+  // 순차 루프 대신 나머지 페이지를 병렬로 받는다(quarterlyupdate 23페이지 기준
+  // 순차 10초 → 병렬 2초). 커서는 단순 오프셋이라 동시 요청해도 결과가 겹치지 않는다.
+  const first = await bubblePage(type, 0, PAGE);
+  const rows = [...(first?.results ?? [])];
+  const remaining = Math.min(first?.remaining ?? 0, MAX_ROWS - rows.length);
+  if (rows.length === 0 || remaining <= 0) return rows;
+
+  const cursors: number[] = [];
+  for (let c = rows.length; c < rows.length + remaining; c += PAGE) cursors.push(c);
+
+  for (let i = 0; i < cursors.length; i += CONCURRENCY) {
+    const batch = await Promise.all(
+      cursors.slice(i, i + CONCURRENCY).map((c) => bubblePage(type, c, PAGE)),
+    );
+    for (const resp of batch) rows.push(...(resp?.results ?? []));
+  }
+  return rows;
+}
+
+function fetchAll(type: string): Promise<Record<string, unknown>[]> {
   const hit = cache.get(type);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.rows;
 
-  const rows: Record<string, unknown>[] = [];
-  let cursor = 0;
-  // 최대 50페이지(5000건) 안전장치. quarterlyupdate 가 1800건+ 이라 10페이지(1000건)
-  // 상한이면 뒷부분 분기 보고가 누락된다(재무 점검 분기 목록이 일부만 떴던 원인).
-  for (let i = 0; i < 50; i++) {
-    const resp = await bubblePage(type, cursor, 100);
-    const batch = resp?.results ?? [];
-    rows.push(...batch);
-    const remaining = resp?.remaining ?? 0;
-    cursor += batch.length;
-    if (batch.length === 0 || remaining <= 0) break;
-  }
+  const rows = loadAll(type);
   cache.set(type, { at: Date.now(), rows });
+  // 실패한 프라미스를 그대로 두면 5분간 계속 같은 오류를 돌려준다 → 즉시 무효화
+  rows.catch(() => {
+    if (cache.get(type)?.rows === rows) cache.delete(type);
+  });
   return rows;
 }
 
@@ -326,7 +350,10 @@ export type SlabFinancialReport = {
   year: number;
   month: number; // 3 / 6 / 9 / 12 (분기→누적월)
   quarter: string; // "1분기" 등
+  reportMade: boolean; // 분기보고 제출 여부(slab `report made` 기록 유무)
   hasFile: boolean; // 재무제표 파일 제출 여부(false=미제출, 선택 불가)
+  hasShareholderList: boolean; // 주주명부 첨부 여부
+  hasRegister: boolean; // 등기부등본 첨부 여부
   fileUrls: string[]; // 제출 파일(들) — BS/IS 분리 제출이면 2개+ (미제출이면 [])
   fileName: string; // 표시용 요약(단일이면 파일명, 복수면 "N개 파일")
   // slab 기입 지표(참고 표시용 — 판정은 PDF 추출값 우선)
@@ -352,6 +379,12 @@ const QUARTER_MONTH: Record<string, number> = {
 function normCdnUrl(u: unknown): string | null {
   if (typeof u !== "string" || !u) return null;
   return u.startsWith("//") ? "https:" + u : u;
+}
+
+// 첨부 필드는 파일 1개면 문자열, 여러 개면 배열로 온다.
+function hasAttachment(v: unknown): boolean {
+  if (Array.isArray(v)) return v.some((x) => Boolean(normCdnUrl(x)));
+  return Boolean(normCdnUrl(v));
 }
 
 function fileNameFromUrl(u: string): string {
@@ -413,7 +446,10 @@ export async function getSlabFinancialReports(): Promise<SlabFinancialReport[]> 
       year,
       month,
       quarter,
+      reportMade: Boolean(str(r["report made"])),
       hasFile: urls.length > 0,
+      hasShareholderList: hasAttachment(r["shareholders list"]),
+      hasRegister: hasAttachment(r["company register"]),
       fileUrls: urls,
       fileName:
         urls.length === 0
@@ -447,6 +483,66 @@ export async function getSlabFinancialReports(): Promise<SlabFinancialReport[]> 
       (QUARTER_ORD[b.quarter] ?? 0) - (QUARTER_ORD[a.quarter] ?? 0) ||
       a.nameKr.localeCompare(b.nameKr, "ko"),
   );
+}
+
+// ---- 연락처 — 대표·담당자 (미제출 기업 연락 돌리기용) ----------------------
+// slab 에는 "담당자 성함" 필드가 없다. 담당 연락처(email/phone)만 있고, 이름은
+// 최근 분기보고를 작성한 사람(quarterlyupdate.writer)이 사실상 유일한 단서라
+// 어느 분기 보고에서 온 이름인지와 함께 싣는다.
+
+export type SlabCompanyContact = {
+  companyId: string;
+  nameKr: string; // bubble_id 가 없는 매물을 회사명으로 매칭할 때 쓴다
+  ceoName: string | null;
+  ceoPhone: string | null;
+  ceoEmail: string | null;
+  contactEmail: string | null; // company.email
+  contactPhone: string | null; // company.phone
+  extraEmail: string | null; // additional contact email
+  extraPhone: string | null; // additional contact phone
+  lastWriter: string | null; // 최근 분기보고 작성자
+  lastWriterPeriod: string | null; // "2026 1분기"
+};
+
+/** 회사별 대표·담당 연락처 + 최근 분기보고 작성자. */
+export async function getSlabCompanyContacts(): Promise<SlabCompanyContact[]> {
+  const [companyRows, quarterRows] = await Promise.all([
+    fetchAll("company"),
+    fetchAll("quarterlyupdate"),
+  ]);
+
+  // 회사별 최신(연도·분기) 작성자
+  const writerByCompany = new Map<string, { name: string; ord: number; period: string }>();
+  for (const r of quarterRows) {
+    const cid = str(r["company"]);
+    const name = str(r["writer"]);
+    if (!cid || !name) continue;
+    const year = nnum(r["year"]) ?? 0;
+    const quarter = str(r["quarter"]) ?? "";
+    const ord = year * 10 + (QUARTER_ORD[quarter] ?? 0);
+    const prev = writerByCompany.get(cid);
+    if (!prev || ord >= prev.ord)
+      writerByCompany.set(cid, { name, ord, period: `${year} ${quarter}` });
+  }
+
+  return companyRows
+    .filter((c) => c._id)
+    .map((c) => {
+      const w = writerByCompany.get(String(c._id));
+      return {
+        companyId: String(c._id),
+        nameKr: str(c["company name"]) ?? "",
+        ceoName: str(c["CEO name"]),
+        ceoPhone: str(c["CEO phone"]),
+        ceoEmail: str(c["CEO email"]),
+        contactEmail: str(c["email"]),
+        contactPhone: str(c["phone"]),
+        extraEmail: str(c["additional contact email"]),
+        extraPhone: str(c["additional contact phone"]),
+        lastWriter: w?.name ?? null,
+        lastWriterPeriod: w?.period ?? null,
+      };
+    });
 }
 
 // ---- 법인등기부등본 — 회사별 최신 등기 파일 ------------------------------
