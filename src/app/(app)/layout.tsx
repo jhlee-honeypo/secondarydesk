@@ -23,8 +23,11 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-svh flex-1">
       {/* 좌측 레일: 평소엔 얇게(아이콘만) 자리만 차지하고, 호버하면 그 위로
-          오버레이되며 펼쳐진다(콘텐츠 리플로우 없음). */}
-      <div className="relative hidden w-16 shrink-0 md:block">
+          오버레이되며 펼쳐진다(콘텐츠 리플로우 없음).
+          본문을 아래로 스크롤해도 메뉴가 따라오도록 뷰포트 높이(h-svh)로 고정한다.
+          flex 기본 stretch 면 높이가 문서 전체가 되어 sticky 가 동작하지 않으므로
+          self-start 로 늘어남을 막는다. */}
+      <div className="sticky top-0 hidden h-svh w-16 shrink-0 self-start md:block">
         <aside className="group absolute inset-y-0 left-0 z-40 flex w-16 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out hover:w-60 hover:shadow-xl">
           <div className="flex h-14 items-center gap-2 px-5">
             <span className="size-5 shrink-0 rounded-md bg-primary" aria-hidden />

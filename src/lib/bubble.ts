@@ -145,7 +145,10 @@ function normFund(r: Record<string, unknown>): BubbleFund {
   };
 }
 
-function mapStatus(raw: string | null): string {
+// slab 상태 원문(Live / Written-off / Exit) → 우리 코드값. 회사 존속상태
+// (company."company investment status")와 펀드 포지션(sparklabinvestment.
+// "investment status")이 같은 어휘를 쓰므로 양쪽에서 공유한다.
+export function mapStatus(raw: string | null): string {
   if (!raw) return "LIVE";
   const s = raw.toLowerCase();
   if (s.includes("written")) return "W/O";

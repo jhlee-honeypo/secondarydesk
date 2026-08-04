@@ -176,6 +176,11 @@ export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
   "W/O": "W/O",
 };
 
+// §4.6 ListingFund.position_status — 그 펀드가 그 매물을 취급하는 상태.
+// slab sparklabinvestment."investment status" 동기화값이라 영업값 ON SALE 은 없다.
+// ListingStatus 의 부분집합이므로 라벨·배지 색은 LISTING_STATUS_* 를 함께 쓴다.
+export type PositionStatus = "LIVE" | "EXIT" | "W/O";
+
 // §4.5 HoldingFund.status (마이그레이션 20260609000002 로 enum 재정의됨)
 export type HoldingFundStatus = "운용 중" | "청산 준비" | "만기 연장" | "청산 완료";
 

@@ -1,7 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { getSlabCompanyContacts, getSlabFinancialReports } from "@/lib/bubble";
-import type { FinancialStatement } from "@/lib/types";
+import {
+  LISTING_STATUS_LABEL,
+  LISTING_STATUS_VARIANT,
+  type FinancialStatement,
+  type ListingStatus,
+  type PositionStatus,
+} from "@/lib/types";
 import { fundLabel, formatWon, formatDate } from "@/lib/format";
 import {
   computeMetrics,
@@ -73,6 +79,7 @@ type ListingRow = {
   company_name: string;
   company_name_en: string | null;
   bubble_id: string | null;
+  status: ListingStatus;
 };
 
 // slab 분기보고 제출 현황(우리 DB 가 아니라 slab quarterlyupdate 가 원천).
@@ -171,6 +178,8 @@ export default async function FinancialsPage({
     sub: Submission;
     contact: CompanyContact | null;
     memoCount: number;
+    // 이 조합의 취급상태(ERP 투자내역 없으면 null → 회사 상태로 폴백)
+    position: PositionStatus | null;
   }[] = [];
   // 제출 현황을 볼 분기 — 선택한 분기, 미선택이면 slab 의 최신 분기
   let subY = selY;
@@ -179,9 +188,15 @@ export default async function FinancialsPage({
   if (fund) {
     const { data: lf } = await supabase
       .from("listing_funds")
-      .select("listing_id")
+      .select("listing_id, position_status")
       .eq("holding_fund_id", fund);
     const listingIds = (lf ?? []).map((r) => r.listing_id as string);
+    const positionByListing = new Map<string, PositionStatus | null>(
+      (lf ?? []).map((r) => [
+        r.listing_id as string,
+        r.position_status as PositionStatus | null,
+      ]),
+    );
 
     if (listingIds.length > 0) {
       const [
@@ -193,7 +208,7 @@ export default async function FinancialsPage({
       ] = await Promise.all([
         supabase
           .from("listings")
-          .select("id, company_name, company_name_en, bubble_id")
+          .select("id, company_name, company_name_en, bubble_id, status")
           .in("id", listingIds)
           .order("company_name"),
         supabase
@@ -270,6 +285,7 @@ export default async function FinancialsPage({
             contactByName.get(normName(l.company_name)) ??
             null,
           memoCount: memoCountByListing.get(l.id) ?? 0,
+          position: positionByListing.get(l.id) ?? null,
         }))
         // 분기보고 제출 기업이 상단, 미제출은 하단. 같은 그룹 안에서는 회사명순.
         .sort(
@@ -373,7 +389,7 @@ export default async function FinancialsPage({
               </tr>
             </thead>
             <tbody>
-              {roster.map(({ listing, fin, sub, contact, memoCount }) => {
+              {roster.map(({ listing, fin, sub, contact, memoCount, position }) => {
                 const memoCell = (
                   <td className="px-3 py-2 text-center">
                     <ListingMemos
@@ -385,11 +401,29 @@ export default async function FinancialsPage({
                   </td>
                 );
                 const companyCell = (
-                  <CompanyContactHover
-                    companyName={listing.company_name}
-                    companyNameEn={listing.company_name_en}
-                    contact={contact}
-                  />
+                  <div className="flex items-start gap-1.5">
+                    <div className="min-w-0">
+                      <CompanyContactHover
+                        companyName={listing.company_name}
+                        companyNameEn={listing.company_name_en}
+                        contact={contact}
+                      />
+                    </div>
+                    {/* 이 조합의 취급상태. ERP 투자내역이 없는 링크(수기 태그)는
+                        회사 전체 상태로 폴백하고 tooltip 으로 출처를 밝힌다. */}
+                    <Badge
+                      variant={LISTING_STATUS_VARIANT[position ?? listing.status]}
+                      className="shrink-0 text-[10px]"
+                      title={
+                        position
+                          ? "이 조합의 취급상태 (ERP 투자내역 기준)"
+                          : "이 조합의 ERP 투자내역이 없어 회사 전체 상태를 표시합니다"
+                      }
+                    >
+                      {LISTING_STATUS_LABEL[position ?? listing.status]}
+                      {!position && "*"}
+                    </Badge>
+                  </div>
                 );
                 if (!fin) {
                   // 데이터 미수집/미제출 — 회색 빈 행

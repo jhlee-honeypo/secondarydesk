@@ -32,7 +32,8 @@ export function ApplySyncButton({ disabled }: { disabled?: boolean }) {
         (result.ok ? (
           <span className="text-sm text-muted-foreground">
             펀드 신규 {result.fundsCreated}·갱신 {result.fundsUpdated} / 매물 보정{" "}
-            {result.listingsUpdated} · 조합연결 +{result.fundLinksAdded} 완료
+            {result.listingsUpdated} · 조합연결 +{result.fundLinksAdded} · 취급상태{" "}
+            {result.positionsUpdated} 완료
           </span>
         ) : (
           <span className="text-sm text-destructive">{result.error}</span>
