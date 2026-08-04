@@ -99,6 +99,16 @@ const NO_SUBMISSION: Submission = {
   register: false,
 };
 
+/** 좁은 열의 긴 머리글 — 단어 중간에서 깨지지 않게 지정한 자리에서만 두 줄로 끊는다. */
+function TwoLine({ top, bottom }: { top: string; bottom: string }) {
+  return (
+    <>
+      <span className="block">{top}</span>
+      <span className="block">{bottom}</span>
+    </>
+  );
+}
+
 function OX({ on }: { on: boolean }) {
   return (
     <span className={on ? "font-semibold text-emerald-600" : "font-semibold text-rose-500"}>
@@ -121,13 +131,14 @@ function SubmissionCells({ sub }: { sub: Submission }) {
           </Badge>
         )}
       </td>
-      <td className="px-3 py-2 text-center">
+      {/* O/X 세 열은 내용이 한 글자라 머리글 폭에 맞춰 px-2 로 좁힌다(머리글과 동일). */}
+      <td className="px-2 py-2 text-center">
         <OX on={sub.shareholderList} />
       </td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-2 py-2 text-center">
         <OX on={sub.financialReport} />
       </td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-2 py-2 text-center">
         <OX on={sub.register} />
       </td>
     </>
@@ -354,19 +365,28 @@ export default async function FinancialsPage({
         ) : (
           <Card className="overflow-x-auto p-0">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+              {/* whitespace-nowrap 은 상속되므로 thead 에 한 번 걸어 모든 머리글의
+                  단어 중간 줄바꿈을 막는다. 좁은 열의 긴 이름만 TwoLine 으로
+                  의미 단위에서 두 줄로 끊는다(최대 2줄). */}
+              <thead className="border-b bg-muted/40 text-left text-xs whitespace-nowrap text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2">상태</th>
                   <th className="px-3 py-2">회사</th>
-                  <th className="px-3 py-2 text-center whitespace-nowrap">
+                  <th className="px-3 py-2 text-center">
                     분기보고
                     {subLabel && (
                       <span className="block text-[10px] font-normal">{subLabel}</span>
                     )}
                   </th>
-                  <th className="px-3 py-2 text-center">주주명부</th>
-                  <th className="px-3 py-2 text-center">재무제표</th>
-                  <th className="px-3 py-2 text-center">등기부등본</th>
+                  <th className="px-2 py-2 text-center">
+                    <TwoLine top="주주" bottom="명부" />
+                  </th>
+                  <th className="px-2 py-2 text-center">
+                    <TwoLine top="재무" bottom="제표" />
+                  </th>
+                  <th className="px-2 py-2 text-center">
+                    <TwoLine top="등기부" bottom="등본" />
+                  </th>
                   <th className="px-3 py-2">기준</th>
                   <th className="px-3 py-2 text-right">보유현금</th>
                   <th className="px-3 py-2 text-right">월평균매출</th>
@@ -383,8 +403,12 @@ export default async function FinancialsPage({
                     월평균차액
                   </th>
                   <th className="px-3 py-2 text-right">런웨이</th>
-                  <th className="px-3 py-2 text-right">자본잠식률</th>
-                  <th className="px-3 py-2 text-right">매출성장</th>
+                  <th className="px-3 py-2 text-right">
+                    <TwoLine top="자본" bottom="잠식률" />
+                  </th>
+                  <th className="px-3 py-2 text-right">
+                    <TwoLine top="매출" bottom="성장" />
+                  </th>
                   <th className="px-3 py-2">손익</th>
                   <th className="px-3 py-2">투자유치</th>
                   <th className="px-3 py-2 text-right">직원</th>
