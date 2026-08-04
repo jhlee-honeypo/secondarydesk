@@ -164,6 +164,14 @@
   }
 }
 
+/* 재무 점검 상단 요약 토글(financials-view.tsx) — 서버 재요청 없이 표 행만 숨긴다.
+   행의 data-sub(제출 여부)·data-exited(EXIT·W/O) 는 financials/page.tsx 에서 붙인다. */
+[data-fin-view~="only-submitted"] tbody tr[data-sub="no"],
+[data-fin-view~="only-unsubmitted"] tbody tr[data-sub="yes"],
+[data-fin-view~="hide-exited"] tbody tr[data-exited="1"] {
+  display: none;
+}
+
 /* 진행률 미확정(목록 로딩·업로드) 시 좌→우로 흐르는 인디터미닛 바 */
 @keyframes progress-indeterminate {
   0% {

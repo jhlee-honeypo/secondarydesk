@@ -26,6 +26,10 @@ import {
   type CompanyContact,
 } from "./_components/company-contact";
 import { ListingMemos } from "./_components/listing-memos";
+import {
+  FinancialsView,
+  type FinancialsSummary,
+} from "./_components/financials-view";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Claude 추출 배치(서버 액션)용 여유 타임아웃
@@ -65,6 +69,10 @@ function runwayClass(v: number | null): string {
 function erosionClass(v: number | null): string {
   if (v === null || v <= 0) return "";
   return v > 0.5 ? RED : YELLOW;
+}
+// EXIT·상각(W/O) — 실 작업 대상이 아닌 상태(가리기 토글 대상)
+function isExited(status: ListingStatus | PositionStatus): boolean {
+  return status === "EXIT" || status === "W/O";
 }
 // 회사명 매칭용 정규화(법인격·공백·구두점 제거)
 function normName(s: string): string {
@@ -296,19 +304,24 @@ export default async function FinancialsPage({
     }
   }
 
-  const graded = roster
-    .filter((r) => r.fin)
-    .map((r) => {
-      const metrics = computeMetrics(r.fin!);
-      return { health: gradeHealth(r.fin!, metrics).level };
-    });
-  const counts = {
-    danger: graded.filter((g) => g.health === "danger").length,
-    warning: graded.filter((g) => g.health === "warning").length,
-    good: graded.filter((g) => g.health === "good").length,
-    none: roster.length - graded.length,
+  // 요약 카운트 — "W/O·EXIT 가리기" 토글에 맞춰 두 벌을 넘긴다(클라에서 골라 표시).
+  const summarize = (rows: typeof roster): FinancialsSummary => {
+    const graded = rows
+      .filter((r) => r.fin)
+      .map((r) => gradeHealth(r.fin!, computeMetrics(r.fin!)).level);
+    return {
+      submitted: rows.filter((r) => r.sub.reportMade).length,
+      unsubmitted: rows.filter((r) => !r.sub.reportMade).length,
+      danger: graded.filter((g) => g === "danger").length,
+      warning: graded.filter((g) => g === "warning").length,
+      good: graded.filter((g) => g === "good").length,
+      none: rows.length - graded.length,
+    };
   };
-  const submitted = roster.filter((r) => r.sub.reportMade).length;
+  const summary = {
+    all: summarize(roster),
+    live: summarize(roster.filter((r) => !isExited(r.position ?? r.listing.status))),
+  };
   const subLabel = subY > 0 ? `${subY}년 ${subM / 3}분기` : "";
   const me = await getCurrentUser();
 
@@ -324,225 +337,221 @@ export default async function FinancialsPage({
         <FinancialsClient />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <FinancialsFilters
-          funds={fundOptions}
-          periods={periodOptions}
-          fund={fund}
-          period={period}
-        />
-        {fund && (
-          <div className="flex flex-wrap gap-2 text-sm">
-            <Badge variant="outline" className="text-emerald-600">
-              분기보고 제출 {submitted}
-            </Badge>
-            <Badge variant="outline" className="text-rose-500">
-              미제출 {roster.length - submitted}
-            </Badge>
-            <span className="w-2" />
-            <Badge variant="destructive">위험 {counts.danger}</Badge>
-            <Badge variant="secondary">주의 {counts.warning}</Badge>
-            <Badge variant="outline">양호 {counts.good}</Badge>
-            <Badge variant="outline" className="text-muted-foreground">
-              데이터 없음 {counts.none}
-            </Badge>
-          </div>
-        )}
-      </div>
-
-      {!fund ? (
-        <Card className="p-10 text-center text-sm text-muted-foreground">
-          상단에서 <b>조합</b>을 선택하면 소속 매물 목록과 재무상태가 표시됩니다.
-        </Card>
-      ) : roster.length === 0 ? (
-        <Card className="p-10 text-center text-sm text-muted-foreground">
-          이 조합에 연결된 매물이 없습니다.
-        </Card>
-      ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2">상태</th>
-                <th className="px-3 py-2">회사</th>
-                <th className="px-3 py-2 text-center whitespace-nowrap">
-                  분기보고
-                  {subLabel && (
-                    <span className="block text-[10px] font-normal">{subLabel}</span>
-                  )}
-                </th>
-                <th className="px-3 py-2 text-center">주주명부</th>
-                <th className="px-3 py-2 text-center">재무제표</th>
-                <th className="px-3 py-2 text-center">등기부등본</th>
-                <th className="px-3 py-2">기준</th>
-                <th className="px-3 py-2 text-right">보유현금</th>
-                <th className="px-3 py-2 text-right">월평균매출</th>
-                <th className="px-3 py-2 text-right">런웨이</th>
-                <th className="px-3 py-2 text-right">자본잠식률</th>
-                <th className="px-3 py-2 text-right">매출성장</th>
-                <th className="px-3 py-2">손익</th>
-                <th className="px-3 py-2">근거</th>
-                <th className="px-3 py-2">투자유치</th>
-                <th className="px-3 py-2 text-right">직원</th>
-                <th className="px-3 py-2">하이라이트</th>
-                <th className="px-3 py-2 text-center">메모</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map(({ listing, fin, sub, contact, memoCount, position }) => {
-                const memoCell = (
-                  <td className="px-3 py-2 text-center">
-                    <ListingMemos
-                      listingId={listing.id}
-                      companyName={listing.company_name}
-                      count={memoCount}
-                      currentUserId={me?.id ?? null}
-                    />
-                  </td>
-                );
-                const companyCell = (
-                  <div className="flex items-start gap-1.5">
-                    <div className="min-w-0">
-                      <CompanyContactHover
+      <FinancialsView
+        filters={
+          <FinancialsFilters
+            funds={fundOptions}
+            periods={periodOptions}
+            fund={fund}
+            period={period}
+          />
+        }
+        summary={fund ? summary : null}
+      >
+        {!fund ? (
+          <Card className="p-10 text-center text-sm text-muted-foreground">
+            상단에서 <b>조합</b>을 선택하면 소속 매물 목록과 재무상태가 표시됩니다.
+          </Card>
+        ) : roster.length === 0 ? (
+          <Card className="p-10 text-center text-sm text-muted-foreground">
+            이 조합에 연결된 매물이 없습니다.
+          </Card>
+        ) : (
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">상태</th>
+                  <th className="px-3 py-2">회사</th>
+                  <th className="px-3 py-2 text-center whitespace-nowrap">
+                    분기보고
+                    {subLabel && (
+                      <span className="block text-[10px] font-normal">{subLabel}</span>
+                    )}
+                  </th>
+                  <th className="px-3 py-2 text-center">주주명부</th>
+                  <th className="px-3 py-2 text-center">재무제표</th>
+                  <th className="px-3 py-2 text-center">등기부등본</th>
+                  <th className="px-3 py-2">기준</th>
+                  <th className="px-3 py-2 text-right">보유현금</th>
+                  <th className="px-3 py-2 text-right">월평균매출</th>
+                  <th className="px-3 py-2 text-right">런웨이</th>
+                  <th className="px-3 py-2 text-right">자본잠식률</th>
+                  <th className="px-3 py-2 text-right">매출성장</th>
+                  <th className="px-3 py-2">손익</th>
+                  <th className="px-3 py-2">근거</th>
+                  <th className="px-3 py-2">투자유치</th>
+                  <th className="px-3 py-2 text-right">직원</th>
+                  <th className="px-3 py-2">하이라이트</th>
+                  <th className="px-3 py-2 text-center">메모</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map(({ listing, fin, sub, contact, memoCount, position }) => {
+                  // 상단 요약 토글이 CSS 로 걸러 쓰는 표식(financials-view.tsx / globals.css)
+                  const rowFlags = {
+                    "data-sub": sub.reportMade ? "yes" : "no",
+                    "data-exited": isExited(position ?? listing.status) ? "1" : "0",
+                  };
+                  const memoCell = (
+                    <td className="px-3 py-2 text-center">
+                      <ListingMemos
+                        listingId={listing.id}
                         companyName={listing.company_name}
-                        companyNameEn={listing.company_name_en}
-                        contact={contact}
+                        count={memoCount}
+                        currentUserId={me?.id ?? null}
                       />
+                    </td>
+                  );
+                  const companyCell = (
+                    <div className="flex items-start gap-1.5">
+                      <div className="min-w-0">
+                        <CompanyContactHover
+                          companyName={listing.company_name}
+                          companyNameEn={listing.company_name_en}
+                          contact={contact}
+                        />
+                      </div>
+                      {/* 이 조합의 취급상태. ERP 투자내역이 없는 링크(수기 태그)는
+                          회사 전체 상태로 폴백하고 tooltip 으로 출처를 밝힌다. */}
+                      <Badge
+                        variant={LISTING_STATUS_VARIANT[position ?? listing.status]}
+                        className="shrink-0 text-[10px]"
+                        title={
+                          position
+                            ? "이 조합의 취급상태 (ERP 투자내역 기준)"
+                            : "이 조합의 ERP 투자내역이 없어 회사 전체 상태를 표시합니다"
+                        }
+                      >
+                        {LISTING_STATUS_LABEL[position ?? listing.status]}
+                        {!position && "*"}
+                      </Badge>
                     </div>
-                    {/* 이 조합의 취급상태. ERP 투자내역이 없는 링크(수기 태그)는
-                        회사 전체 상태로 폴백하고 tooltip 으로 출처를 밝힌다. */}
-                    <Badge
-                      variant={LISTING_STATUS_VARIANT[position ?? listing.status]}
-                      className="shrink-0 text-[10px]"
-                      title={
-                        position
-                          ? "이 조합의 취급상태 (ERP 투자내역 기준)"
-                          : "이 조합의 ERP 투자내역이 없어 회사 전체 상태를 표시합니다"
-                      }
-                    >
-                      {LISTING_STATUS_LABEL[position ?? listing.status]}
-                      {!position && "*"}
-                    </Badge>
-                  </div>
-                );
-                if (!fin) {
-                  // 데이터 미수집/미제출 — 회색 빈 행
+                  );
+                  if (!fin) {
+                    // 데이터 미수집/미제출 — 회색 빈 행
+                    return (
+                      <tr
+                        key={listing.id}
+                        {...rowFlags}
+                        className="border-b align-top text-muted-foreground/60 last:border-0"
+                      >
+                        <td className="px-3 py-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            데이터 없음
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 font-medium">{companyCell}</td>
+                        <SubmissionCells sub={sub} />
+                        <td className="px-3 py-2">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2">—</td>
+                        <td className="px-3 py-2 text-xs">미수집</td>
+                        <td className="px-3 py-2">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2">—</td>
+                        {memoCell}
+                      </tr>
+                    );
+                  }
+                  const metrics = computeMetrics(fin);
+                  const health = gradeHealth(fin, metrics);
                   return (
                     <tr
                       key={listing.id}
-                      className="border-b align-top text-muted-foreground/60 last:border-0"
+                      {...rowFlags}
+                      className="border-b align-top last:border-0"
                     >
                       <td className="px-3 py-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          데이터 없음
+                        <Badge variant={HEALTH_VARIANT[health.level]}>
+                          {HEALTH_LABEL[health.level]}
                         </Badge>
                       </td>
                       <td className="px-3 py-2 font-medium">{companyCell}</td>
                       <SubmissionCells sub={sub} />
-                      <td className="px-3 py-2">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2">—</td>
-                      <td className="px-3 py-2 text-xs">미수집</td>
-                      <td className="px-3 py-2">—</td>
-                      <td className="px-3 py-2 text-right">—</td>
-                      <td className="px-3 py-2">—</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                        {fin.report_year} · {fin.report_month / 3}분기
+                        <span className="block text-[10px]">
+                          {fin.source === "slab" ? "slab" : "업로드"}
+                        </span>
+                        {fin.source_file_url && (
+                          <span className="mt-0.5 block">
+                            <BoardFileViewer fin={fin} />
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">{formatWon(metrics.heldCash)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatWon(metrics.monthlyRevenue)}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right whitespace-nowrap",
+                          runwayClass(metrics.runwayMonths),
+                        )}
+                      >
+                        {months(metrics.runwayMonths)}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right",
+                          erosionClass(metrics.capitalErosion),
+                        )}
+                      >
+                        {pct(metrics.capitalErosion)}
+                      </td>
+                      <td className="px-3 py-2 text-right">{pct(metrics.revenueGrowth)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {metrics.isProfit ? (
+                          <span className="text-emerald-600">흑자</span>
+                        ) : (
+                          <span className="text-rose-600">적자</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {health.reasons.join(", ")}
+                        <span className="mt-0.5 block text-[10px]">
+                          갱신 {formatDate(fin.updated_at)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {fin.funding_round ? fundingLabel(fin.funding_round) : "—"}
+                        {fin.funding_series && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            {fin.funding_series}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {typeof fin.head_count === "number"
+                          ? `${fin.head_count}명`
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {fin.business_highlight ? (
+                          <span
+                            className="line-clamp-2 max-w-[20rem] whitespace-pre-wrap"
+                            title={fin.business_highlight}
+                          >
+                            {fin.business_highlight}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       {memoCell}
                     </tr>
                   );
-                }
-                const metrics = computeMetrics(fin);
-                const health = gradeHealth(fin, metrics);
-                return (
-                  <tr key={listing.id} className="border-b align-top last:border-0">
-                    <td className="px-3 py-2">
-                      <Badge variant={HEALTH_VARIANT[health.level]}>
-                        {HEALTH_LABEL[health.level]}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 font-medium">{companyCell}</td>
-                    <SubmissionCells sub={sub} />
-                    <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
-                      {fin.report_year} · {fin.report_month / 3}분기
-                      <span className="block text-[10px]">
-                        {fin.source === "slab" ? "slab" : "업로드"}
-                      </span>
-                      {fin.source_file_url && (
-                        <span className="mt-0.5 block">
-                          <BoardFileViewer fin={fin} />
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">{formatWon(metrics.heldCash)}</td>
-                    <td className="px-3 py-2 text-right">
-                      {formatWon(metrics.monthlyRevenue)}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-3 py-2 text-right whitespace-nowrap",
-                        runwayClass(metrics.runwayMonths),
-                      )}
-                    >
-                      {months(metrics.runwayMonths)}
-                    </td>
-                    <td
-                      className={cn(
-                        "px-3 py-2 text-right",
-                        erosionClass(metrics.capitalErosion),
-                      )}
-                    >
-                      {pct(metrics.capitalErosion)}
-                    </td>
-                    <td className="px-3 py-2 text-right">{pct(metrics.revenueGrowth)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {metrics.isProfit ? (
-                        <span className="text-emerald-600">흑자</span>
-                      ) : (
-                        <span className="text-rose-600">적자</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {health.reasons.join(", ")}
-                      <span className="mt-0.5 block text-[10px]">
-                        갱신 {formatDate(fin.updated_at)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {fin.funding_round ? fundingLabel(fin.funding_round) : "—"}
-                      {fin.funding_series && (
-                        <span className="block text-[10px] text-muted-foreground">
-                          {fin.funding_series}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      {typeof fin.head_count === "number"
-                        ? `${fin.head_count}명`
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {fin.business_highlight ? (
-                        <span
-                          className="line-clamp-2 max-w-[20rem] whitespace-pre-wrap"
-                          title={fin.business_highlight}
-                        >
-                          {fin.business_highlight}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    {memoCell}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
-      )}
+                })}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </FinancialsView>
     </div>
   );
 }
