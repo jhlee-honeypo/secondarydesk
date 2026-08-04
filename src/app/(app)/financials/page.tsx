@@ -1,6 +1,9 @@
+import { ExternalLink } from "lucide-react";
+
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
 import { getSlabCompanyContacts, getSlabFinancialReports } from "@/lib/bubble";
+import { slabQuarterlyUrl } from "@/lib/slab-links";
 import {
   LISTING_STATUS_LABEL,
   LISTING_STATUS_VARIANT,
@@ -27,6 +30,7 @@ import {
 } from "./_components/financials-view";
 import { HealthBadge } from "./_components/health-badge";
 import { MeetingPin } from "./_components/meeting-pin";
+import { FinancialHistory } from "./_components/financial-history";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Claude 추출 배치(서버 액션)용 여유 타임아웃
@@ -118,17 +122,34 @@ function OX({ on }: { on: boolean }) {
   );
 }
 
-function SubmissionCells({ sub }: { sub: Submission }) {
+function SubmissionCells({
+  sub,
+  slabUrl,
+}: {
+  sub: Submission;
+  /** slab 분기보고 원본 화면(ERP 미연결 매물은 null → 링크 없이 배지만) */
+  slabUrl: string | null;
+}) {
+  const label = sub.reportMade ? "제출" : "미제출";
+  const tone = sub.reportMade ? "text-emerald-600" : "text-rose-500";
   return (
     <>
       <td className="px-3 py-2 text-center">
-        {sub.reportMade ? (
-          <Badge variant="outline" className="text-[10px] text-emerald-600">
-            제출
+        {slabUrl ? (
+          <Badge asChild variant="outline" className={cn("text-[10px]", tone)}>
+            <a
+              href={slabUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="slab 분기보고 원본 화면 열기(새 탭)"
+            >
+              {label}
+              <ExternalLink />
+            </a>
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-[10px] text-rose-500">
-            미제출
+          <Badge variant="outline" className={cn("text-[10px]", tone)}>
+            {label}
           </Badge>
         )}
       </td>
@@ -447,6 +468,8 @@ export default async function FinancialsPage({
                     "data-sub": sub.reportMade ? "yes" : "no",
                     "data-exited": isExited(position ?? listing.status) ? "1" : "0",
                   };
+                  // 분기보고 열이 가리키는 분기(subY/subM)의 slab 원본 화면
+                  const slabUrl = slabQuarterlyUrl(listing.bubble_id, subY, subM);
                   const memoCell = (
                     <td className="px-3 py-2 text-center">
                       <ListingMemos
@@ -469,11 +492,21 @@ export default async function FinancialsPage({
                   const companyCell = (
                     <div className="flex items-start gap-1.5">
                       <div className="min-w-0">
-                        <CompanyContactHover
+                        {/* 클릭 = 분기별 재무 추이(오버레이), hover = slab 연락처 */}
+                        <FinancialHistory
                           companyName={listing.company_name}
                           companyNameEn={listing.company_name_en}
-                          contact={contact}
-                        />
+                          bubbleCompanyId={listing.bubble_id}
+                          financialCompanyName={
+                            fin?.company_name ?? listing.company_name
+                          }
+                        >
+                          <CompanyContactHover
+                            companyName={listing.company_name}
+                            companyNameEn={listing.company_name_en}
+                            contact={contact}
+                          />
+                        </FinancialHistory>
                       </div>
                       {/* 이 조합의 취급상태. ERP 투자내역이 없는 링크(수기 태그)는
                           회사 전체 상태로 폴백하고 tooltip 으로 출처를 밝힌다. */}
@@ -509,7 +542,7 @@ export default async function FinancialsPage({
                           </Badge>
                         </td>
                         <td className="px-3 py-2 font-medium">{companyCell}</td>
-                        <SubmissionCells sub={sub} />
+                        <SubmissionCells sub={sub} slabUrl={slabUrl} />
                         <td className="px-3 py-2">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
@@ -546,7 +579,7 @@ export default async function FinancialsPage({
                         />
                       </td>
                       <td className="px-3 py-2 font-medium">{companyCell}</td>
-                      <SubmissionCells sub={sub} />
+                      <SubmissionCells sub={sub} slabUrl={slabUrl} />
                       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                         {fin.report_year} · {fin.report_month / 3}분기
                         <span className="block text-[10px]">

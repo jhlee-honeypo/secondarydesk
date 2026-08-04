@@ -80,8 +80,14 @@ export function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials
  *   - 저장 이력이 있는 회사 → 저장된 최신 분기보다 뒤인 분기만
  *   - 저장 이력이 없는 회사 → 파일 있는 '가장 최신' 분기 1건만
  */
+/** 대상 선별 방식. 기본(미지정)은 "회사별 저장된 최신 분기보다 새 것"만 — 크론이
+ *  앞으로만 전진하는 규칙이다. 그래서 중간에 빠진 과거 분기는 영구히 건너뛴다.
+ *  backfillYear 를 주면 그 연도의 미저장 분기를 전부 대상으로 삼는다(빈칸 메우기). */
+export type PendingScope = { backfillYear?: number };
+
 export async function findPendingReports(
   supabase: SupabaseClient,
+  scope?: PendingScope,
 ): Promise<SlabFinancialReport[]> {
   const [reports, savedRes] = await Promise.all([
     getSlabFinancialReports(),
@@ -116,6 +122,8 @@ export async function findPendingReports(
   const pending = reports.filter((r) => {
     if (!r.hasFile) return false;
     if (savedKeys.has(`${r.companyId}|${r.year}|${r.month}`)) return false;
+    // 백필: 그 연도의 미저장 분기를 전부(최신 분기 규칙 무시).
+    if (scope?.backfillYear) return r.year === scope.backfillYear;
     const o = ord(r.year, r.month);
     const max = savedMax.get(r.companyId);
     if (max == null) return o === latestByCompany.get(r.companyId); // 이력 없음 → 최신 1건
@@ -207,13 +215,15 @@ export async function runFinancialSync(
   supabase: SupabaseClient,
   // 상한 축소용(운영·점검). 미지정이면 MAX_PER_RUN.
   limit?: number,
+  // 과거 분기 빈칸 메우기용(미지정이면 기존 "새 분기만" 규칙).
+  scope?: PendingScope,
 ): Promise<FinancialSyncResult> {
   const startedAt = Date.now();
   const errors: string[] = [];
 
   let pendingAll: SlabFinancialReport[];
   try {
-    pendingAll = await findPendingReports(supabase);
+    pendingAll = await findPendingReports(supabase, scope);
   } catch (e) {
     return {
       ok: false,

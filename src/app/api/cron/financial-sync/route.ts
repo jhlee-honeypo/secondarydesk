@@ -25,11 +25,21 @@ export async function GET(request: Request) {
 
   try {
     // ?limit=N — 점검·소량 실행용(상한만 낮춘다. 기본은 모듈의 MAX_PER_RUN).
-    const raw = new URL(request.url).searchParams.get("limit");
+    const params = new URL(request.url).searchParams;
+    const raw = params.get("limit");
     const limit = raw && Number.isFinite(Number(raw)) ? Number(raw) : undefined;
 
+    // ?backfillYear=2026 — 그 연도의 빠진 분기를 메운다(기본은 새 분기만 전진).
+    // 크론 스케줄에는 붙이지 않는다 — 사람이 범위를 정해 수동으로 돌리는 용도.
+    const yearRaw = params.get("backfillYear");
+    const year = yearRaw && /^\d{4}$/.test(yearRaw) ? Number(yearRaw) : undefined;
+
     const supabase = createAdminClient();
-    const result = await runFinancialSync(supabase, limit);
+    const result = await runFinancialSync(
+      supabase,
+      limit,
+      year ? { backfillYear: year } : undefined,
+    );
     return Response.json(
       { at: new Date().toISOString(), ...result },
       { status: result.ok ? 200 : 500 },

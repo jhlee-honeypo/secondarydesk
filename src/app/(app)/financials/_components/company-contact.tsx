@@ -50,7 +50,8 @@ export function CompanyContactHover({
   return (
     <HoverCard openDelay={150} closeDelay={120}>
       <HoverCardTrigger asChild>
-        <span className="cursor-help underline decoration-dotted underline-offset-4">
+        {/* 클릭하면 분기별 재무가 열리므로(FinancialHistory) 커서는 pointer 로 둔다 */}
+        <span className="cursor-pointer underline decoration-dotted underline-offset-4">
           {companyName}
         </span>
       </HoverCardTrigger>
