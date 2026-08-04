@@ -26,6 +26,7 @@ import {
   type FinancialsSummary,
 } from "./_components/financials-view";
 import { HealthBadge } from "./_components/health-badge";
+import { MeetingPin } from "./_components/meeting-pin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Claude 추출 배치(서버 액션)용 여유 타임아웃
@@ -194,6 +195,8 @@ export default async function FinancialsPage({
     memoCount: number;
     // 이 조합의 취급상태(ERP 투자내역 없으면 null → 회사 상태로 폴백)
     position: PositionStatus | null;
+    // 미팅 대상 핀(메모의 리마인드 기록과 별개인 on/off 상태)
+    meeting: boolean;
   }[] = [];
   // 제출 현황을 볼 분기 — 선택한 분기, 미선택이면 slab 의 최신 분기
   let subY = selY;
@@ -217,6 +220,7 @@ export default async function FinancialsPage({
         { data: listingRows },
         { data: finRows },
         { data: memoRows },
+        { data: meetingRows },
         slabReports,
         slabContacts,
       ] = await Promise.all([
@@ -231,6 +235,10 @@ export default async function FinancialsPage({
           .order("report_year", { ascending: false })
           .order("report_month", { ascending: false }),
         supabase.from("listing_memos").select("listing_id").in("listing_id", listingIds),
+        supabase
+          .from("listing_meeting_targets")
+          .select("listing_id")
+          .in("listing_id", listingIds),
         // slab 이 죽어도 재무 표는 떠야 하므로 실패 시 빈 배열(제출 현황만 전부 미제출로 표시)
         getSlabFinancialReports().catch(() => []),
         getSlabCompanyContacts().catch(() => []),
@@ -241,6 +249,9 @@ export default async function FinancialsPage({
         const k = m.listing_id as string;
         memoCountByListing.set(k, (memoCountByListing.get(k) ?? 0) + 1);
       }
+      const meetingListings = new Set(
+        (meetingRows ?? []).map((r) => r.listing_id as string),
+      );
       const contactByBubble = new Map<string, CompanyContact>();
       const contactByName = new Map<string, CompanyContact>();
       for (const c of slabContacts) {
@@ -300,6 +311,7 @@ export default async function FinancialsPage({
             null,
           memoCount: memoCountByListing.get(l.id) ?? 0,
           position: positionByListing.get(l.id) ?? null,
+          meeting: meetingListings.has(l.id),
         }))
         // 분기보고 제출 기업이 상단, 미제출은 하단. 같은 그룹 안에서는 회사명순.
         .sort(
@@ -413,11 +425,23 @@ export default async function FinancialsPage({
                   <th className="px-3 py-2">투자유치</th>
                   <th className="px-3 py-2 text-right">직원</th>
                   <th className="px-3 py-2">하이라이트</th>
-                  <th className="px-3 py-2 text-center">메모</th>
+                  <th
+                    className="px-3 py-2 text-center"
+                    title="실무 코멘트 스레드(예: 분기보고 리마인드 메일 발송 기록)"
+                  >
+                    메모
+                  </th>
+                  <th
+                    className="px-2 py-2 text-center"
+                    title="재무를 보고 미팅이 필요하다고 판단한 기업에 핀 — 메모와 별개의 표시입니다"
+                  >
+                    미팅
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {roster.map(({ listing, fin, sub, contact, memoCount, position }) => {
+                {roster.map(
+                  ({ listing, fin, sub, contact, memoCount, position, meeting }) => {
                   // 상단 요약 토글이 CSS 로 걸러 쓰는 표식(financials-view.tsx / globals.css)
                   const rowFlags = {
                     "data-sub": sub.reportMade ? "yes" : "no",
@@ -430,6 +454,15 @@ export default async function FinancialsPage({
                         companyName={listing.company_name}
                         count={memoCount}
                         currentUserId={me?.id ?? null}
+                      />
+                    </td>
+                  );
+                  const meetingCell = (
+                    <td className="px-2 py-2 text-center">
+                      <MeetingPin
+                        listingId={listing.id}
+                        companyName={listing.company_name}
+                        initial={meeting}
                       />
                     </td>
                   );
@@ -490,6 +523,7 @@ export default async function FinancialsPage({
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2">—</td>
                         {memoCell}
+                        {meetingCell}
                       </tr>
                     );
                   }
@@ -589,9 +623,11 @@ export default async function FinancialsPage({
                         )}
                       </td>
                       {memoCell}
+                      {meetingCell}
                     </tr>
                   );
-                })}
+                  },
+                )}
               </tbody>
             </table>
           </Card>

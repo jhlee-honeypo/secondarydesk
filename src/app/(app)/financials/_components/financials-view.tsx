@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { EyeOff, FileCheck, FileX } from "lucide-react";
+import { EyeOff, FileCheck, FileX, Pin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ export function FinancialsView({
 }) {
   const [only, setOnly] = useState<"submitted" | "unsubmitted" | null>(null);
   const [hideExited, setHideExited] = useState(false);
+  const [onlyMeeting, setOnlyMeeting] = useState(false);
 
   // 카운트는 "가리기" 상태에 맞춰 바꿔 보여준다(제출/미제출 토글은 표만 걸러 카운트 유지).
   const s = summary && (hideExited ? summary.live : summary.all);
@@ -40,6 +41,7 @@ export function FinancialsView({
     only === "submitted" && "only-submitted",
     only === "unsubmitted" && "only-unsubmitted",
     hideExited && "hide-exited",
+    onlyMeeting && "only-meeting",
   ]
     .filter(Boolean)
     .join(" ");
@@ -112,6 +114,28 @@ export function FinancialsView({
               >
                 <EyeOff />
                 W/O·EXIT 가리기
+              </button>
+            </Badge>
+            {/* 핀으로 표시한 미팅 대상만 남긴다. 핀은 클라이언트 상태라 개수를
+                서버가 알 수 없어 숫자는 붙이지 않는다. */}
+            <Badge
+              asChild
+              variant="outline"
+              className={cn(
+                "cursor-pointer",
+                onlyMeeting
+                  ? "border-amber-500 bg-amber-500 text-white"
+                  : "text-amber-600",
+              )}
+            >
+              <button
+                type="button"
+                aria-pressed={onlyMeeting}
+                onClick={() => setOnlyMeeting((v) => !v)}
+                title="핀으로 지정한 미팅 대상 기업만 보기"
+              >
+                <Pin />
+                미팅 대상만
               </button>
             </Badge>
 
