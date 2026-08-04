@@ -9,12 +9,7 @@ import {
   type PositionStatus,
 } from "@/lib/types";
 import { fundLabel, formatWon, formatDate } from "@/lib/format";
-import {
-  computeMetrics,
-  gradeHealth,
-  HEALTH_LABEL,
-  type HealthLevel,
-} from "@/lib/financial-health";
+import { computeMetrics, gradeHealth } from "@/lib/financial-health";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -30,15 +25,10 @@ import {
   FinancialsView,
   type FinancialsSummary,
 } from "./_components/financials-view";
+import { HealthBadge } from "./_components/health-badge";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // Claude 추출 배치(서버 액션)용 여유 타임아웃
-
-const HEALTH_VARIANT: Record<HealthLevel, "destructive" | "secondary" | "outline"> = {
-  danger: "destructive",
-  warning: "secondary",
-  good: "outline",
-};
 
 function pct(v: number | null): string {
   return v === null ? "—" : `${(v * 100).toFixed(0)}%`;
@@ -64,6 +54,11 @@ const YELLOW =
 // 런웨이 3개월 미만 → 빨강
 function runwayClass(v: number | null): string {
   return v !== null && v < 3 ? RED : "";
+}
+// 월평균 차액(매출−지출) — 음수면 매달 현금이 줄어드는 중
+function surplusClass(v: number | null): string {
+  if (v === null) return "";
+  return v < 0 ? "text-rose-600" : "text-emerald-600";
 }
 // 자본잠식률 0~50% → 노랑, 50% 초과 → 빨강 (잠식 없음/음수는 강조 안 함)
 function erosionClass(v: number | null): string {
@@ -375,11 +370,22 @@ export default async function FinancialsPage({
                   <th className="px-3 py-2">기준</th>
                   <th className="px-3 py-2 text-right">보유현금</th>
                   <th className="px-3 py-2 text-right">월평균매출</th>
+                  <th
+                    className="px-3 py-2 text-right"
+                    title="판관비 ÷ 보고월 — 런웨이 계산과 같은 기준(매출원가 제외)"
+                  >
+                    월평균지출
+                  </th>
+                  <th
+                    className="px-3 py-2 text-right"
+                    title="월평균매출 − 월평균지출 (음수면 매달 현금 소모)"
+                  >
+                    월평균차액
+                  </th>
                   <th className="px-3 py-2 text-right">런웨이</th>
                   <th className="px-3 py-2 text-right">자본잠식률</th>
                   <th className="px-3 py-2 text-right">매출성장</th>
                   <th className="px-3 py-2">손익</th>
-                  <th className="px-3 py-2">근거</th>
                   <th className="px-3 py-2">투자유치</th>
                   <th className="px-3 py-2 text-right">직원</th>
                   <th className="px-3 py-2">하이라이트</th>
@@ -437,7 +443,11 @@ export default async function FinancialsPage({
                         className="border-b align-top text-muted-foreground/60 last:border-0"
                       >
                         <td className="px-3 py-2">
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge
+                            variant="outline"
+                            className="cursor-help text-[10px]"
+                            title="재무제표 미수집 — 판정 근거 없음"
+                          >
                             데이터 없음
                           </Badge>
                         </td>
@@ -449,8 +459,9 @@ export default async function FinancialsPage({
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2">—</td>
-                        <td className="px-3 py-2 text-xs">미수집</td>
                         <td className="px-3 py-2">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2">—</td>
@@ -460,6 +471,9 @@ export default async function FinancialsPage({
                   }
                   const metrics = computeMetrics(fin);
                   const health = gradeHealth(fin, metrics);
+                  // 월평균차액 = 매출 − 지출 (monthlyBurn 은 소모를 양수로 보므로 부호 반전)
+                  const monthlySurplus =
+                    metrics.monthlyBurn === null ? null : -metrics.monthlyBurn;
                   return (
                     <tr
                       key={listing.id}
@@ -467,9 +481,11 @@ export default async function FinancialsPage({
                       className="border-b align-top last:border-0"
                     >
                       <td className="px-3 py-2">
-                        <Badge variant={HEALTH_VARIANT[health.level]}>
-                          {HEALTH_LABEL[health.level]}
-                        </Badge>
+                        <HealthBadge
+                          level={health.level}
+                          reasons={health.reasons}
+                          updatedLabel={formatDate(fin.updated_at)}
+                        />
                       </td>
                       <td className="px-3 py-2 font-medium">{companyCell}</td>
                       <SubmissionCells sub={sub} />
@@ -487,6 +503,17 @@ export default async function FinancialsPage({
                       <td className="px-3 py-2 text-right">{formatWon(metrics.heldCash)}</td>
                       <td className="px-3 py-2 text-right">
                         {formatWon(metrics.monthlyRevenue)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatWon(metrics.monthlySga)}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right",
+                          surplusClass(monthlySurplus),
+                        )}
+                      >
+                        {formatWon(monthlySurplus)}
                       </td>
                       <td
                         className={cn(
@@ -511,12 +538,6 @@ export default async function FinancialsPage({
                         ) : (
                           <span className="text-rose-600">적자</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {health.reasons.join(", ")}
-                        <span className="mt-0.5 block text-[10px]">
-                          갱신 {formatDate(fin.updated_at)}
-                        </span>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {fin.funding_round ? fundingLabel(fin.funding_round) : "—"}
