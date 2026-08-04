@@ -94,15 +94,6 @@ export function FinancialsView({
               </button>
             </Badge>
 
-            <span className="w-2" />
-            <Badge variant="destructive">위험 {s.danger}</Badge>
-            <Badge variant="secondary">주의 {s.warning}</Badge>
-            <Badge variant="outline">양호 {s.good}</Badge>
-            <Badge variant="outline" className="text-muted-foreground">
-              데이터 없음 {s.none}
-            </Badge>
-
-            <span className="w-2" />
             <Badge
               asChild
               variant="outline"
@@ -122,6 +113,14 @@ export function FinancialsView({
                 <EyeOff />
                 W/O·EXIT 가리기
               </button>
+            </Badge>
+
+            <span className="w-2" />
+            <Badge variant="destructive">위험 {s.danger}</Badge>
+            <Badge variant="secondary">주의 {s.warning}</Badge>
+            <Badge variant="outline">양호 {s.good}</Badge>
+            <Badge variant="outline" className="text-muted-foreground">
+              데이터 없음 {s.none}
             </Badge>
           </div>
         )}
