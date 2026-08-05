@@ -498,9 +498,20 @@ export function FinancialsClient() {
                 return (
                   <div
                     key={r.key}
+                    // 카드 어디를 눌러도 그 회사 원본이 오른쪽에 뜬다(입력칸 클릭 포함 —
+                    // 값을 고치려는 순간이 곧 원본을 봐야 하는 순간이다). 이미 이 카드가
+                    // 열려 있으면 아무것도 하지 않아, 파일이 여러 개인 회사의
+                    // '원본 보기' 선택을 첫 파일로 되돌리지 않는다.
+                    onClick={() => {
+                      if (!isActive && r.source_file_urls[0])
+                        setActiveUrl(r.source_file_urls[0]);
+                    }}
                     className={cn(
                       "rounded-lg border p-3",
-                      isActive && "ring-2 ring-primary/40",
+                      isActive
+                        ? "ring-2 ring-primary/40"
+                        : r.source_file_urls.length > 0 &&
+                            "cursor-pointer hover:border-primary/40 hover:bg-muted/30",
                     )}
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -598,7 +609,11 @@ export function FinancialsClient() {
                           <button
                             key={i}
                             type="button"
-                            onClick={() => setActiveUrl(u)}
+                            // 카드 클릭 핸들러가 첫 파일로 덮어쓰지 않게 여기서 멈춘다.
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveUrl(u);
+                            }}
                             className={cn(
                               "inline-flex items-center gap-1 underline",
                               u === activeUrl

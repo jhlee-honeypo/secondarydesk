@@ -2,7 +2,11 @@ import { ExternalLink } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/auth";
-import { getSlabCompanyContacts, getSlabFinancialReports } from "@/lib/bubble";
+import {
+  getSlabCompanyContacts,
+  getSlabFinancialReports,
+  type SlabFinancialReport,
+} from "@/lib/bubble";
 import { slabQuarterlyUrl } from "@/lib/slab-links";
 import {
   LISTING_STATUS_LABEL,
@@ -212,6 +216,9 @@ export default async function FinancialsPage({
     listing: ListingRow;
     fin: FinancialStatement | null;
     sub: Submission;
+    // 이 분기의 slab 분기보고 원본. 재무제표가 없어도 기업이 직접 기입한 정성
+    // 정보(투자유치·직원·하이라이트)는 여기 있어, fin 이 없는 행에서 대신 보여준다.
+    slab: SlabFinancialReport | null;
     contact: CompanyContact | null;
     memoCount: number;
     // 이 조합의 취급상태(ERP 투자내역 없으면 null → 회사 상태로 폴백)
@@ -289,19 +296,13 @@ export default async function FinancialsPage({
           }
         }
       }
-      const subByBubble = new Map<string, Submission>();
-      const subByName = new Map<string, Submission>();
+      const repByBubble = new Map<string, SlabFinancialReport>();
+      const repByName = new Map<string, SlabFinancialReport>();
       for (const r of slabReports) {
         if (r.year !== subY || r.month !== subM) continue;
-        const s: Submission = {
-          reportMade: r.reportMade,
-          shareholderList: r.hasShareholderList,
-          financialReport: r.hasFile,
-          register: r.hasRegister,
-        };
-        subByBubble.set(r.companyId, s);
+        repByBubble.set(r.companyId, r);
         const n = normName(r.nameKr);
-        if (!subByName.has(n)) subByName.set(n, s);
+        if (!repByName.has(n)) repByName.set(n, r);
       }
 
       const byBubble = new Map<string, FinancialStatement>();
@@ -316,24 +317,35 @@ export default async function FinancialsPage({
       }
 
       roster = ((listingRows ?? []) as ListingRow[])
-        .map((l) => ({
-          listing: l,
-          fin:
-            (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
-            byName.get(normName(l.company_name)) ??
-            null,
-          sub:
-            (l.bubble_id ? subByBubble.get(l.bubble_id) : undefined) ??
-            subByName.get(normName(l.company_name)) ??
-            NO_SUBMISSION,
-          contact:
-            (l.bubble_id ? contactByBubble.get(l.bubble_id) : undefined) ??
-            contactByName.get(normName(l.company_name)) ??
-            null,
-          memoCount: memoCountByListing.get(l.id) ?? 0,
-          position: positionByListing.get(l.id) ?? null,
-          meeting: meetingListings.has(l.id),
-        }))
+        .map((l) => {
+          const rep =
+            (l.bubble_id ? repByBubble.get(l.bubble_id) : undefined) ??
+            repByName.get(normName(l.company_name)) ??
+            null;
+          return {
+            listing: l,
+            fin:
+              (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
+              byName.get(normName(l.company_name)) ??
+              null,
+            sub: rep
+              ? {
+                  reportMade: rep.reportMade,
+                  shareholderList: rep.hasShareholderList,
+                  financialReport: rep.hasFile,
+                  register: rep.hasRegister,
+                }
+              : NO_SUBMISSION,
+            slab: rep,
+            contact:
+              (l.bubble_id ? contactByBubble.get(l.bubble_id) : undefined) ??
+              contactByName.get(normName(l.company_name)) ??
+              null,
+            memoCount: memoCountByListing.get(l.id) ?? 0,
+            position: positionByListing.get(l.id) ?? null,
+            meeting: meetingListings.has(l.id),
+          };
+        })
         // 분기보고 제출 기업이 상단, 미제출은 하단. 같은 그룹 안에서는 회사명순.
         .sort(
           (a, b) =>
@@ -462,7 +474,16 @@ export default async function FinancialsPage({
               </thead>
               <tbody>
                 {roster.map(
-                  ({ listing, fin, sub, contact, memoCount, position, meeting }) => {
+                  ({
+                    listing,
+                    fin,
+                    sub,
+                    slab,
+                    contact,
+                    memoCount,
+                    position,
+                    meeting,
+                  }) => {
                   // 상단 요약 토글이 CSS 로 걸러 쓰는 표식(financials-view.tsx / globals.css)
                   const rowFlags = {
                     "data-sub": sub.reportMade ? "yes" : "no",
@@ -552,9 +573,35 @@ export default async function FinancialsPage({
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2">—</td>
-                        <td className="px-3 py-2">—</td>
-                        <td className="px-3 py-2 text-right">—</td>
-                        <td className="px-3 py-2">—</td>
+                        {/* 아래 세 열은 재무제표가 없어도 채워진다 — 기업이 slab
+                            분기보고에 직접 기입한 값이라 추출이 필요 없다. */}
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {slab?.newFundingRound
+                            ? fundingLabel(slab.newFundingRound)
+                            : "—"}
+                          {slab?.fundingSeries && (
+                            <span className="block text-[10px]">
+                              {slab.fundingSeries}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          {typeof slab?.headCount === "number"
+                            ? `${slab.headCount}명`
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {slab?.businessHighlight ? (
+                            <span
+                              className="line-clamp-2 max-w-[20rem] whitespace-pre-wrap"
+                              title={slab.businessHighlight}
+                            >
+                              {slab.businessHighlight}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
                         {memoCell}
                         {meetingCell}
                       </tr>
