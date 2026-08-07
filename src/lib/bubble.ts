@@ -841,3 +841,106 @@ function getAllFundsSorted(fundRows: Record<string, unknown>[]): BubbleFund[] {
     .filter((f) => f.id)
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
+
+// ---- 발행주식수 점검 — slab · 분기보고 자가입력 두 출처 ----------------------
+// 세 번째 출처인 등기값은 Supabase `corporate_registrations` 에 이미 쌓고 있으므로
+// 여기서 다루지 않는다(별도 OCR 없음). 화면에서 bubble_company_id 로 조인한다.
+//
+// 주의 — slab 주식정보 필드는 '미입력'이 null 이 아니라 0 으로 들어오는 경우가 많다.
+// 0 을 값으로 취급하면 등기 대조에서 '불일치(차 -70,602주)' 처럼 값이 어긋난 것으로
+// 오분류되므로 양수만 값으로 본다(입력 누락과 값 불일치를 구분하기 위함).
+function positive(v: unknown): number | null {
+  const n = nnum(v);
+  return n && n > 0 ? n : null;
+}
+
+// slab 에 남아 있는 테스트 레코드. 점검 표에 섞이면 안 되므로 제외하고,
+// 몇 건을 걸렀는지는 화면에 명시한다(조용히 버리지 않는다).
+const TEST_COMPANY_RE = /테스트|^test$/i;
+
+export type ShareAuditCompany = {
+  companyId: string; // slab company._id (= corporate_registrations.bubble_company_id)
+  nameKr: string;
+  nameEn: string | null;
+  status: string; // 회사 존속상태(LIVE/EXIT/W/O)
+  fundIds: string[]; // 이 회사를 보유한 slab fund _id
+  slabShares: number | null; // slab 회사정보 'share outstanding'(계산값)
+  reportShares: number | null; // 회사가 분기보고에 직접 적은 발행주식총수
+  reportPeriod: string | null; // 그 값이 나온 분기, 예: "2026 1분기"
+};
+
+export type ShareAuditResult = {
+  companies: ShareAuditCompany[];
+  excludedTestRecords: number;
+};
+
+/**
+ * 발행주식수 점검용 회사 목록 — slab 값 + 분기보고 자가입력값(+ 그 분기).
+ *
+ * 분기보고값은 '특정 분기' 가 아니라 **최신 분기부터 역순으로 찾은 첫 양수값**을 쓴다.
+ * 분기를 하나로 고정하면 그 분기에 주식수를 안 적은 회사가 전부 빈칸이 되어 비교
+ * 자체가 불가능해진다. 대신 어느 분기 값인지를 reportPeriod 로 함께 실어 근거를 남긴다.
+ */
+export async function getShareAuditCompanies(): Promise<ShareAuditResult> {
+  const [companyRows, quarterRows] = await Promise.all([
+    fetchAll("company"),
+    fetchAll("quarterlyupdate"),
+  ]);
+
+  // 회사별 분기보고를 최신순으로 모아 첫 양수 주식수를 채택.
+  const quartersByCompany = new Map<string, Record<string, unknown>[]>();
+  for (const q of quarterRows) {
+    const cid = str(q["company"]);
+    if (!cid) continue;
+    const list = quartersByCompany.get(cid);
+    if (list) list.push(q);
+    else quartersByCompany.set(cid, [q]);
+  }
+
+  const ord = (r: Record<string, unknown>) =>
+    (nnum(r["year"]) ?? 0) * 10 + (QUARTER_ORD[String(r["quarter"])] ?? 0);
+
+  let excludedTestRecords = 0;
+  const companies: ShareAuditCompany[] = [];
+  for (const c of companyRows) {
+    const id = String(c._id ?? "");
+    if (!id) continue;
+    const nameKr = str(c["company name"]) ?? "(이름 없음)";
+    if (TEST_COMPANY_RE.test(nameKr)) {
+      excludedTestRecords++;
+      continue;
+    }
+
+    let reportShares: number | null = null;
+    let reportPeriod: string | null = null;
+    const quarters = [...(quartersByCompany.get(id) ?? [])].sort(
+      (a, b) => ord(b) - ord(a),
+    );
+    for (const q of quarters) {
+      const v = positive(q["latest issued share outstanding"]);
+      if (v != null) {
+        reportShares = v;
+        reportPeriod = `${q["year"] ?? "?"} ${q["quarter"] ?? "?"}`;
+        break;
+      }
+    }
+
+    companies.push({
+      companyId: id,
+      nameKr,
+      nameEn: str(c["company name eng"]),
+      status: mapStatus(str(c["company investment status"])),
+      fundIds: Array.isArray(c["fund type"])
+        ? (c["fund type"] as unknown[]).map((x) => String(x))
+        : [],
+      slabShares: positive(c["share outstanding"]),
+      reportShares,
+      reportPeriod,
+    });
+  }
+
+  return {
+    companies: companies.sort((a, b) => a.nameKr.localeCompare(b.nameKr, "ko")),
+    excludedTestRecords,
+  };
+}

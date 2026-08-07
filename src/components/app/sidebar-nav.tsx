@@ -14,6 +14,7 @@ import {
   Package,
   ScrollText,
   Search,
+  Scale,
   Stethoscope,
   Users,
 } from "lucide-react";
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
   { href: "/financials", label: "재무 점검", icon: Stethoscope, ready: true },
   { href: "/financial-status", label: "재무 추출 현황", icon: FileSpreadsheet, ready: true },
   { href: "/registrations", label: "등기 정보", icon: ScrollText, ready: true },
+  { href: "/share-audit", label: "발행주식수 점검", icon: Scale, ready: true },
 ];
 
 // lead(관리자) 전용 항목
