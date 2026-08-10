@@ -76,6 +76,8 @@ const NUM_COLS: NumCol[] = [
     better: "up",
     point: true,
   },
+  // 영업이익(영업손실은 음수) — 추출 확장 이전 분기는 null 이라 '—' 로 남는다.
+  { label: "영업이익", get: (f) => f.operating_income, fmt: won, better: "up" },
 ];
 
 /** 이전(더 오래된) 분기 대비 증감 한 줄. 비교 대상이 없으면 그리지 않는다. */

@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { FileText } from "lucide-react";
+import { useState, useTransition } from "react";
+import { FileText, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { formatWon } from "@/lib/format";
 import {
@@ -19,6 +22,7 @@ import {
   type HealthLevel,
 } from "@/lib/financial-health";
 import type { FinancialStatement } from "@/lib/types";
+import { updateFinancial } from "../actions";
 
 const HEALTH_VARIANT: Record<HealthLevel, "destructive" | "secondary" | "outline"> = {
   danger: "destructive",
@@ -26,17 +30,70 @@ const HEALTH_VARIANT: Record<HealthLevel, "destructive" | "secondary" | "outline
   good: "outline",
 };
 
-const FIELDS: { key: keyof FinancialStatement; label: string }[] = [
+/** 수정 가능한 숫자 열 — 순서·이름을 추출 검토 화면(financials-client)과 맞춘다.
+ *  서버 화이트리스트는 actions.ts EDITABLE_COLUMNS 에 따로 있다. */
+type EditableKey =
+  | "rev_curr"
+  | "ni_curr"
+  | "rev_prev"
+  | "ni_prev"
+  | "cogs"
+  | "operating_income"
+  | "sga"
+  | "cash"
+  | "savings"
+  | "current_assets"
+  | "current_liabilities"
+  | "total_assets"
+  | "total_liabilities"
+  | "total_equity"
+  | "capital"
+  | "retained_earnings";
+
+const FIELDS: { key: EditableKey; label: string }[] = [
   { key: "rev_curr", label: "매출(당기)" },
   { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "rev_prev", label: "매출(전기)" },
   { key: "ni_prev", label: "당기순이익(전기)" },
+  { key: "cogs", label: "매출원가" },
+  { key: "operating_income", label: "영업이익(손실)" },
+  { key: "sga", label: "판매관리비" },
   { key: "cash", label: "현금" },
   { key: "savings", label: "보통예금" },
+  { key: "current_assets", label: "유동자산" },
+  { key: "current_liabilities", label: "유동부채" },
+  { key: "total_assets", label: "자산총계" },
+  { key: "total_liabilities", label: "부채총계" },
   { key: "total_equity", label: "자본총계" },
   { key: "capital", label: "자본금" },
-  { key: "sga", label: "판매관리비" },
+  { key: "retained_earnings", label: "이익잉여금(결손금)" },
 ];
+
+// 앞 9개 열은 DB NOT NULL(기본 0) 이고, Phase 1 확장 열은 미수집이면 null 이다.
+// 지표 계산(computeMetrics)이 앞 9개를 number 로 요구하므로 타입에서 구분한다.
+type CoreKey =
+  | "rev_curr"
+  | "ni_curr"
+  | "rev_prev"
+  | "ni_prev"
+  | "cash"
+  | "savings"
+  | "total_equity"
+  | "capital"
+  | "sga";
+type Values = Record<CoreKey, number> &
+  Record<Exclude<EditableKey, CoreKey>, number | null>;
+
+function readValues(fin: FinancialStatement): Values {
+  return Object.fromEntries(FIELDS.map((f) => [f.key, fin[f.key] ?? null])) as Values;
+}
+// 입력칸 표기 — 미수집(null)은 빈 칸으로 두고, 비운 칸은 저장 시 0 이 된다.
+function inputText(v: number | null): string {
+  return v === null ? "" : v.toLocaleString("en-US");
+}
+function parseInput(s: string): number {
+  return Number(s.replace(/,/g, "")) || 0;
+}
 
 // 크롬 PDF 뷰어 파라미터: 썸네일 패널 제거(navpanes=0) + 폭맞춤 확대(view=FitH)
 const PDF_PARAMS = "#navpanes=0&view=FitH";
@@ -71,25 +128,63 @@ function fundingLabel(v: string): string {
   return FUNDING_LABEL[v] ?? v;
 }
 
-// 보드 행 → 원본 PDF 좌우 분할 뷰어(왼쪽: 저장된 추출값 읽기전용 / 오른쪽: 원본 PDF)
+// 보드 행 → 원본 PDF 좌우 분할 뷰어(왼쪽: 저장된 추출값 — 수정 가능 / 오른쪽: 원본 PDF)
 export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
   const urls = (fin.source_file_url ?? "").split("\n").filter(Boolean);
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [activeUrl, setActiveUrl] = useState(urls[0] ?? "");
 
-  if (urls.length === 0) return null;
+  // 저장된 값 — 수정 후에도 이 오버레이가 바로 새 값을 보여주도록 로컬에 둔다.
+  const [values, setValues] = useState<Values>(() => readValues(fin));
+  const [draft, setDraft] = useState<Values | null>(null); // null = 읽기 모드
+  const [error, setError] = useState<string | null>(null);
+  const [saving, startSaving] = useTransition();
 
-  const metrics = computeMetrics(fin);
-  const health = gradeHealth(fin, metrics);
+  // 지표·건전성은 화면에 보이는 값(수정 반영본) 기준으로 다시 계산한다.
+  const shown = { ...fin, ...values };
+  const metrics = computeMetrics(shown);
+  const health = gradeHealth(shown, metrics);
+
+  function save() {
+    if (!draft) return;
+    // 실제로 바뀐 열만 보낸다 — 손대지 않은 미수집(null) 값이 0 으로 덮이지 않게.
+    const patch: Record<string, number> = {};
+    for (const f of FIELDS) {
+      const next = draft[f.key];
+      if (next !== null && next !== values[f.key]) patch[f.key] = next;
+    }
+    if (Object.keys(patch).length === 0) {
+      setDraft(null);
+      return;
+    }
+    setError(null);
+    startSaving(async () => {
+      const res = await updateFinancial(fin.id, patch);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setValues({ ...draft });
+      setDraft(null);
+      router.refresh(); // 뒤의 표(건전성 등급·월평균 등)를 새 값으로 다시 그린다
+    });
+  }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // 열 때마다 서버가 준 최신 값에서 읽기 모드로 시작한다.
+          setValues(readValues(fin));
+          setDraft(null);
+          setError(null);
+          setOpen(true);
+        }}
         className="text-[10px] text-primary underline"
       >
-        원본 보기
+        {urls.length > 0 ? "원본 보기" : "값 보기·수정"}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -101,7 +196,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
           </DialogHeader>
 
           <div className="flex min-h-0 flex-1 gap-4">
-            {/* 좌: 저장된 추출값(읽기 전용) — 좁게 두고 PDF 영역을 넓힌다 */}
+            {/* 좌: 저장된 추출값 — '수정'을 누르면 원본을 보면서 바로 고칠 수 있다 */}
             <div className="w-[320px] shrink-0 space-y-3 overflow-y-auto pr-1 text-sm">
               <div className="flex items-center gap-2">
                 <Badge variant={HEALTH_VARIANT[health.level]}>
@@ -112,13 +207,62 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
                 </span>
               </div>
 
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {draft ? "원본과 대조해 값을 고치세요" : "저장된 추출값"}
+                </span>
+                {draft ? (
+                  <span className="flex gap-1">
+                    <Button size="sm" className="h-7 px-2" onClick={save} disabled={saving}>
+                      {saving ? "저장 중…" : "저장"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2"
+                      onClick={() => {
+                        setDraft(null);
+                        setError(null);
+                      }}
+                      disabled={saving}
+                    >
+                      취소
+                    </Button>
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => setDraft({ ...values })}
+                  >
+                    <Pencil className="size-3" />
+                    수정
+                  </Button>
+                )}
+              </div>
+              {error && <p className="text-xs text-rose-600">{error}</p>}
+
               <table className="w-full">
                 <tbody>
                   {FIELDS.map((f) => (
                     <tr key={f.key} className="border-b last:border-0">
                       <td className="py-1 pr-2 text-muted-foreground">{f.label}</td>
                       <td className="py-1 text-right tabular-nums">
-                        {formatWon(fin[f.key] as number)}
+                        {draft ? (
+                          <Input
+                            className="h-7 text-right text-xs tabular-nums"
+                            inputMode="numeric"
+                            value={inputText(draft[f.key])}
+                            onChange={(e) =>
+                              setDraft((d) =>
+                                d ? { ...d, [f.key]: parseInput(e.target.value) } : d,
+                              )
+                            }
+                          />
+                        ) : (
+                          formatWon(values[f.key])
+                        )}
                       </td>
                     </tr>
                   ))}

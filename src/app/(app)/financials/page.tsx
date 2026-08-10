@@ -454,6 +454,12 @@ export default async function FinancialsPage({
                   <th className="px-3 py-2 text-right">
                     <TwoLine top="매출" bottom="성장" />
                   </th>
+                  <th
+                    className="px-3 py-2 text-right"
+                    title="손익계산서의 영업이익(영업손실은 음수) · 아래는 영업이익률(영업이익 ÷ 매출)"
+                  >
+                    <TwoLine top="영업" bottom="이익" />
+                  </th>
                   <th className="px-3 py-2">손익</th>
                   <th className="px-3 py-2">투자유치</th>
                   <th className="px-3 py-2 text-right">직원</th>
@@ -572,6 +578,7 @@ export default async function FinancialsPage({
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2">—</td>
                         {/* 아래 세 열은 재무제표가 없어도 채워진다 — 기업이 slab
                             분기보고에 직접 기입한 값이라 추출이 필요 없다. */}
@@ -632,11 +639,11 @@ export default async function FinancialsPage({
                         <span className="block text-[10px]">
                           {fin.source === "slab" ? "slab" : "업로드"}
                         </span>
-                        {fin.source_file_url && (
-                          <span className="mt-0.5 block">
-                            <BoardFileViewer fin={fin} />
-                          </span>
-                        )}
+                        {/* 원본 대조 + 값 수정. 원본 파일이 없는 행도 수정은 되어야 하므로
+                            조건 없이 띄우고, 라벨/우측 패널은 컴포넌트가 알아서 바꾼다. */}
+                        <span className="mt-0.5 block">
+                          <BoardFileViewer fin={fin} />
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-right">{formatWon(metrics.heldCash)}</td>
                       <td className="px-3 py-2 text-right">
@@ -670,6 +677,20 @@ export default async function FinancialsPage({
                         {pct(metrics.capitalErosion)}
                       </td>
                       <td className="px-3 py-2 text-right">{pct(metrics.revenueGrowth)}</td>
+                      {/* 영업이익 — 추출 확장 이전 행은 null(미수집)이라 '—' 로 구분한다 */}
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right whitespace-nowrap",
+                          (fin.operating_income ?? 0) < 0 ? "text-rose-600" : "",
+                        )}
+                      >
+                        {formatWon(fin.operating_income)}
+                        {fin.operating_income !== null && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            {pct(metrics.operatingMargin)}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {metrics.isProfit ? (
                           <span className="text-emerald-600">흑자</span>

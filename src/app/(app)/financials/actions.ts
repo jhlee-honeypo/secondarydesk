@@ -349,6 +349,54 @@ export async function saveFinancials(rows: ReviewRow[]): Promise<SaveResult> {
   return { ok: true, saved: valid.length, skipped };
 }
 
+// 사람이 교정할 수 있는 숫자 열(화이트리스트). 회사·연도·분기는 upsert 키라 제외한다.
+// 서버 함수는 UI 없이도 POST 로 호출될 수 있어, 여기서 열 이름을 직접 검사한다.
+const EDITABLE_COLUMNS = [
+  "rev_curr",
+  "ni_curr",
+  "rev_prev",
+  "ni_prev",
+  "cogs",
+  "operating_income",
+  "sga",
+  "cash",
+  "savings",
+  "current_assets",
+  "current_liabilities",
+  "total_assets",
+  "total_liabilities",
+  "total_equity",
+  "capital",
+  "retained_earnings",
+];
+
+/** 저장된 분기 행의 값 수정 — 원본 대조 화면에서 추출 오류를 사람이 바로 잡는다.
+ *
+ *  ⚠️ revalidatePath 를 부르지 않는다. /financials·/financial-status 모두
+ *  force-dynamic + slab API 조회라 재검증이 몇 초씩 걸린다. 화면은 클라이언트가
+ *  즉시 갱신하고(BoardFileViewer), 표는 저장 후 router.refresh() 로 맞춘다. */
+export async function updateFinancial(
+  id: string,
+  patch: Record<string, number>,
+): Promise<SaveResult> {
+  const me = await getCurrentUser();
+  if (!me) return { ok: false, error: "로그인이 필요합니다." };
+
+  const entries = Object.entries(patch).filter(
+    ([k, v]) => EDITABLE_COLUMNS.includes(k) && typeof v === "number" && Number.isFinite(v),
+  );
+  if (entries.length === 0) return { ok: false, error: "수정할 값이 없습니다." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("financial_statements")
+    .update(Object.fromEntries(entries))
+    .eq("id", id);
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true, saved: entries.length, skipped: 0 };
+}
+
 export async function deleteFinancial(id: string): Promise<SaveResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("financial_statements").delete().eq("id", id);
