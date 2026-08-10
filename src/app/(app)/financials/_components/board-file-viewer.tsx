@@ -50,10 +50,11 @@ type EditableKey =
   | "capital"
   | "retained_earnings";
 
+// 당기·전기를 같은 항목끼리 붙여 원본과 눈으로 대조하기 쉽게 둔다.
 const FIELDS: { key: EditableKey; label: string }[] = [
   { key: "rev_curr", label: "매출(당기)" },
-  { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "rev_prev", label: "매출(전기)" },
+  { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "ni_prev", label: "당기순이익(전기)" },
   { key: "cogs", label: "매출원가" },
   { key: "operating_income", label: "영업이익(손실)" },
@@ -87,9 +88,21 @@ type Values = Record<CoreKey, number> &
 function readValues(fin: FinancialStatement): Values {
   return Object.fromEntries(FIELDS.map((f) => [f.key, fin[f.key] ?? null])) as Values;
 }
-// 입력칸 표기 — 미수집(null)은 빈 칸으로 두고, 비운 칸은 저장 시 0 이 된다.
+
+// 수정 중에는 값을 '문자열'로 들고 있는다. 숫자로 두면 "-" 만 입력한 순간
+// Number("-") = NaN → 0 으로 접혀 음수를 아예 타이핑할 수 없다.
+type Draft = Record<EditableKey, string>;
+
+// 입력칸 표기 — 미수집(null)은 빈 칸. 비운 칸은 저장 시 0(원래 null 이면 그대로 null).
 function inputText(v: number | null): string {
   return v === null ? "" : v.toLocaleString("en-US");
+}
+function makeDraft(values: Values): Draft {
+  return Object.fromEntries(FIELDS.map((f) => [f.key, inputText(values[f.key])])) as Draft;
+}
+// 숫자·쉼표·마이너스만 남긴다(입력 중간 상태는 그대로 보존).
+function sanitize(s: string): string {
+  return s.replace(/[^\d,-]/g, "");
 }
 function parseInput(s: string): number {
   return Number(s.replace(/,/g, "")) || 0;
@@ -137,7 +150,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
 
   // 저장된 값 — 수정 후에도 이 오버레이가 바로 새 값을 보여주도록 로컬에 둔다.
   const [values, setValues] = useState<Values>(() => readValues(fin));
-  const [draft, setDraft] = useState<Values | null>(null); // null = 읽기 모드
+  const [draft, setDraft] = useState<Draft | null>(null); // null = 읽기 모드
   const [error, setError] = useState<string | null>(null);
   const [saving, startSaving] = useTransition();
 
@@ -150,9 +163,16 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
     if (!draft) return;
     // 실제로 바뀐 열만 보낸다 — 손대지 않은 미수집(null) 값이 0 으로 덮이지 않게.
     const patch: Record<string, number> = {};
+    const next = { ...values } as Record<EditableKey, number | null>;
     for (const f of FIELDS) {
-      const next = draft[f.key];
-      if (next !== null && next !== values[f.key]) patch[f.key] = next;
+      const raw = draft[f.key];
+      // 원래 값 없음(null) + 여전히 빈 칸 → 손대지 않은 것으로 본다.
+      if (raw.trim() === "" && values[f.key] === null) continue;
+      const n = parseInput(raw);
+      if (n !== values[f.key]) {
+        patch[f.key] = n;
+        next[f.key] = n;
+      }
     }
     if (Object.keys(patch).length === 0) {
       setDraft(null);
@@ -165,7 +185,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
         setError(res.error);
         return;
       }
-      setValues({ ...draft });
+      setValues(next as Values);
       setDraft(null);
       router.refresh(); // 뒤의 표(건전성 등급·월평균 등)를 새 값으로 다시 그린다
     });
@@ -234,7 +254,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
                     size="sm"
                     variant="outline"
                     className="h-7 px-2"
-                    onClick={() => setDraft({ ...values })}
+                    onClick={() => setDraft(makeDraft(values))}
                   >
                     <Pencil className="size-3" />
                     수정
@@ -252,12 +272,25 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
                         {draft ? (
                           <Input
                             className="h-7 text-right text-xs tabular-nums"
-                            inputMode="numeric"
-                            value={inputText(draft[f.key])}
+                            // number 로 두면 쉼표 표기가 막히고 마이너스 입력도 불편하다
+                            inputMode="text"
+                            value={draft[f.key]}
                             onChange={(e) =>
                               setDraft((d) =>
-                                d ? { ...d, [f.key]: parseInput(e.target.value) } : d,
+                                d ? { ...d, [f.key]: sanitize(e.target.value) } : d,
                               )
+                            }
+                            // 칸을 벗어날 때만 쉼표를 다시 붙인다(타이핑 중에는 방해 없음)
+                            onBlur={() =>
+                              setDraft((d) => {
+                                if (!d) return d;
+                                const raw = d[f.key];
+                                return {
+                                  ...d,
+                                  [f.key]:
+                                    raw.trim() === "" ? "" : inputText(parseInput(raw)),
+                                };
+                              })
                             }
                           />
                         ) : (

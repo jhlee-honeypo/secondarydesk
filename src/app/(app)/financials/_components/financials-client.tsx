@@ -103,10 +103,11 @@ function fileLabel(url: string, fallback?: string | null): string {
   }
 }
 
+// 당기·전기를 같은 항목끼리 붙인다(원본 대조 패널과 같은 순서).
 const NUM_FIELDS: { key: keyof ReviewRow; label: string }[] = [
   { key: "rev_curr", label: "매출(당기)" },
-  { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "rev_prev", label: "매출(전기)" },
+  { key: "ni_curr", label: "당기순이익(당기)" },
   { key: "ni_prev", label: "당기순이익(전기)" },
   { key: "cogs", label: "매출원가" },
   { key: "operating_income", label: "영업이익" },
@@ -134,10 +135,14 @@ export function FinancialsClient() {
   // 검토 단계
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [activeUrl, setActiveUrl] = useState<string | null>(null); // 우측 PDF 패널
+  // 입력 중간 상태 버퍼(`${행}|${필드}` → 원문). 숫자 상태만 두면 "-" 를 친 순간
+  // Number("-") = NaN → 0 으로 접혀 음수를 아예 타이핑할 수 없다.
+  const [raw, setRaw] = useState<Record<string, string>>({});
 
   const closeReview = () => {
     setRows(null);
     setActiveUrl(null);
+    setRaw({});
   };
 
   // slab 선택 단계
@@ -227,6 +232,10 @@ export function FinancialsClient() {
 
   // ---- 검토 표 편집 ----------------------------------------------------------
   function patch(key: string, field: keyof ReviewRow, value: string) {
+    if (field !== "company_name" && field !== "company_name_en") {
+      // 숫자 칸은 원문을 그대로 보여주고(마이너스·입력 중간 상태 보존) 값은 파싱해 둔다.
+      setRaw((m) => ({ ...m, [`${key}|${field}`]: value.replace(/[^\d,-]/g, "") }));
+    }
     setRows((prev) =>
       (prev ?? []).map((r) => {
         if (r.key !== key) return r;
@@ -236,6 +245,14 @@ export function FinancialsClient() {
         return { ...r, [field]: n };
       }),
     );
+  }
+  /** 칸을 벗어나면 원문 버퍼를 버려 쉼표 표기로 돌아간다. */
+  function blurNum(key: string, field: keyof ReviewRow) {
+    setRaw((m) => {
+      const next = { ...m };
+      delete next[`${key}|${field}`];
+      return next;
+    });
   }
 
   async function save() {
@@ -548,9 +565,12 @@ export function FinancialsClient() {
                           <span className="text-muted-foreground">{f.label}</span>
                           <Input
                             className="h-8"
-                            inputMode="numeric"
-                            value={withCommas(r[f.key] as number)}
+                            inputMode="text"
+                            value={
+                              raw[`${r.key}|${f.key}`] ?? withCommas(r[f.key] as number)
+                            }
                             onChange={(e) => patch(r.key, f.key, e.target.value)}
+                            onBlur={() => blurNum(r.key, f.key)}
                           />
                         </label>
                       ))}
