@@ -559,12 +559,19 @@ export function FinancialsClient() {
                         {HEALTH_LABEL[health.level]}
                       </Badge>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* 한 줄에 한 필드 — 3열로 늘어놓으면 원본과 대조하다 항목을
+                        헷갈린다. 라벨 왼쪽·값 오른쪽으로 원본 대조 패널과 같은 형식. */}
+                    <div className="space-y-1">
                       {NUM_FIELDS.map((f) => (
-                        <label key={f.key} className="text-xs">
-                          <span className="text-muted-foreground">{f.label}</span>
+                        <label
+                          key={f.key}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          <span className="w-32 shrink-0 text-muted-foreground">
+                            {f.label}
+                          </span>
                           <Input
-                            className="h-8"
+                            className="h-7 flex-1 text-right text-xs tabular-nums"
                             inputMode="text"
                             value={
                               raw[`${r.key}|${f.key}`] ?? withCommas(r[f.key] as number)
