@@ -66,6 +66,10 @@ export function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials
     totalAssets: pick((d) => d.totalAssets),
     totalLiabilities: pick((d) => d.totalLiabilities),
     retainedEarnings: pick((d) => d.retainedEarnings),
+    // 표제는 값을 가져온 파일의 것을 쓴다(비어있지 않은 첫 값).
+    niLabel: list.map((d) => d.niLabel).find(Boolean) ?? "",
+    oiLabel: list.map((d) => d.oiLabel).find(Boolean) ?? "",
+    reLabel: list.map((d) => d.reLabel).find(Boolean) ?? "",
   };
 }
 

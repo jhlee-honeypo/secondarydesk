@@ -16,9 +16,9 @@ const SYSTEM_PROMPT = [
   "EXTRACTION FIELDS:",
   "1. companyName (string): 회사명 from cover page or header. Remove 주식회사 or (주) prefixes. If cannot determine, set to 'unknown'.",
   "2. revCurr (number): 매출액 current period from 손익계산서 first line. YTD cumulative in KRW.",
-  "3. niCurr (number): 당기순이익 current period. Loss is negative.",
+  "3. niCurr (number): 당기순이익 current period. See SIGN RULES.",
   "4. revPrev (number): 매출액 previous period.",
-  "5. niPrev (number): 당기순이익 previous period.",
+  "5. niPrev (number): 당기순이익 previous period. See SIGN RULES.",
   "6. cash (number): 현금 (cash on hand) portion of 현금및현금성자산, from 재무상태표 유동자산.",
   "   - CRITICAL: cash + savings MUST equal the TOTAL 현금및현금성자산. The two fields must NEVER overlap (no double-counting).",
   "   - If the statement shows a single combined '현금및현금성자산' line with NO breakdown: put the whole amount in cash, set savings to 0.",
@@ -34,23 +34,36 @@ const SYSTEM_PROMPT = [
   "10. month (number): report month - 3, 6, 9, or 12.",
   "11. sga (number): 판매비와관리비 from 손익계산서.",
   "12. cogs (number): 매출원가 (매출원가/상품매출원가) current period from 손익계산서. If there is no 매출원가 line, set 0.",
-  "13. operatingIncome (number): 영업이익 current period (labels: 영업이익/영업손익/영업손실) from 손익계산서 (= 매출총이익 − 판매비와관리비). Loss is negative.",
+  "13. operatingIncome (number): 영업이익 current period (labels: 영업이익/영업손익/영업손실) from 손익계산서 (= 매출총이익 − 판매비와관리비). See SIGN RULES.",
   "14. currentAssets (number): 유동자산 total (Ⅰ.유동자산) from 재무상태표.",
   "15. currentLiabilities (number): 유동부채 total (Ⅰ.유동부채) from 재무상태표.",
   "16. totalAssets (number): 자산총계 (자산총계/자산 총계) from 재무상태표.",
   "17. totalLiabilities (number): 부채총계 (부채총계/부채 총계) from 재무상태표.",
-  "18. retainedEarnings (number): 이익잉여금 from 재무상태표 자본 section. SIGN RULE: a deficit (결손금/미처리결손금) is NEGATIVE — if the statement labels the line 결손금 and shows a positive magnitude, output it as a negative number. An 이익잉여금 already shown negative stays negative.",
+  "18. retainedEarnings (number): 이익잉여금 from 재무상태표 자본 section. See SIGN RULES.",
+  "19. niLabel (string): the bottom-line label EXACTLY as printed, spaces removed (e.g. '당기순이익', '당기순손실', '당기순손익'). Empty string if the document has no such line.",
+  "20. oiLabel (string): the 영업이익/영업손실/영업손익 line label exactly as printed, spaces removed. Empty string if absent.",
+  "21. reLabel (string): the 이익잉여금/결손금 line label exactly as printed, spaces removed (e.g. '이익잉여금', '결손금', '이익잉여금(결손금)'). Empty string if absent.",
+  "",
+  "SIGN RULES (critical — Korean statements RENAME the line by outcome, so the label decides the sign):",
+  "- The same line is titled 당기순이익 when profitable and 당기순손실 when loss-making; likewise 영업이익/영업손실 and 이익잉여금/결손금. Read the label first, then the digits.",
+  "- Label contains 손실 or 결손 → the printed figure is a LOSS MAGNITUDE: output it NEGATIVE. Example: '당기순손실 15,361,732' → niCurr = -15361732.",
+  "- Label contains 손실 or 결손 AND the figure is printed with a minus sign or in parentheses → DOUBLE NEGATIVE = a PROFIT: output it POSITIVE. Example: under a '당기순손실' label, 전기 column '−51,820,191' → niPrev = +51820191.",
+  "- Label contains 이익 (당기순이익/영업이익/이익잉여금) → keep the printed sign as-is (a printed negative stays negative).",
+  "- NEUTRAL captions cover both outcomes and therefore tell you NOTHING about the sign — keep the printed sign EXACTLY as-is, never flip. These include 당기순손익, 영업손익, 당기순이익(손실), 영업이익(손실), 이익잉여금(결손금), 미처분이익잉여금(미처리결손금). 표준재무제표(국세청 표준양식) uses these captions and prints losses with a minus sign, so '당기순손익 282,740,396' is a PROFIT of +282740396 and '이익잉여금 -1,603,367,420' is a deficit.",
+  "- Decision order: (1) caption neutral (contains 손익, or both 이익 and 손실/결손) → print sign as-is. (2) caption loss-only (손실/결손 without 이익) → apply the loss rules above. (3) caption profit-only (이익) → print sign as-is.",
+  "- Comparative statements print 당기 and 전기 columns under ONE label. Apply the rule to BOTH columns, independently per column sign. A '당기순손실' row showing 당기 15,361,732 and 전기 −51,820,191 yields niCurr = -15361732, niPrev = +51820191.",
+  "- These rules govern niCurr, niPrev, operatingIncome and retainedEarnings. 매출/자산/부채/자본 items are printed as-is.",
   "",
   "RULES:",
   "- Missing value: use 0.",
   "- 천원 multiply 1000, 백만원 multiply 1000000.",
-  "- Loss (손실) is negative. Parenthesized numbers are negative.",
   "- CONSOLIDATED PRIORITY: If the document is a 연결재무제표/연결손익계산서 (consolidated) or shows both 별도(separate) and 연결(consolidated) figures, ALWAYS use the 연결(consolidated) figures (지배기업+종속기업 합산). Only fall back to 별도 figures when no consolidated figures exist.",
   "- No thousand separators in output.",
   "- If document is only 재무상태표 (balance sheet), set revCurr/niCurr/revPrev/niPrev/sga/cogs/operatingIncome to 0.",
   "- If document is only 손익계산서 (income statement), set cash/savings/totalEquity/capital/currentAssets/currentLiabilities/totalAssets/totalLiabilities/retainedEarnings to 0.",
   "- For 재무상태표 items in a comparative statement (당기/전기 or 제N기/제N-1기 두 열), use the CURRENT period (당기 / most recent) column.",
   "- SELF-CHECK (balance sheet): totalAssets must equal totalLiabilities + totalEquity. If they differ, re-read the statement.",
+  "- SELF-CHECK (signs): niLabel contains 손실 → niCurr MUST be negative. oiLabel contains 손실 → operatingIncome MUST be negative. reLabel contains 결손 → retainedEarnings MUST be negative. Fix any violation before submitting.",
   "",
   "Submit via submit_financial_data tool.",
 ].join("\n");
@@ -79,6 +92,9 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       totalAssets: { type: "number" },
       totalLiabilities: { type: "number" },
       retainedEarnings: { type: "number" },
+      niLabel: { type: "string" },
+      oiLabel: { type: "string" },
+      reLabel: { type: "string" },
     },
     required: [
       "companyName",
@@ -99,6 +115,9 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       "totalAssets",
       "totalLiabilities",
       "retainedEarnings",
+      "niLabel",
+      "oiLabel",
+      "reLabel",
     ],
   },
 };
@@ -122,12 +141,26 @@ export type ExtractedFinancials = {
   totalAssets: number;
   totalLiabilities: number;
   retainedEarnings: number;
+  // 부호 판정의 근거로 쓴 줄 표제(저장하지 않음 — 검증·감사용).
+  niLabel: string;
+  oiLabel: string;
+  reLabel: string;
 };
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 function num(v: unknown): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+// 라벨이 손실/결손이면 당기 값은 반드시 음수다 — 모델이 손실 금액을 양수로 낸 경우를
+// 코드에서 되돌린다(대표적 오추출: '당기순손실 15,361,732' → +15361732).
+// 전기(niPrev)는 같은 라벨 아래 부호가 반대일 수 있어(이중부정) 코드로 판정하지 않는다.
+// '당기순이익(손실)'·'이익잉여금(결손금)' 같은 겸용 표제는 결과를 알려주지 않으므로 건드리지 않는다.
+function signByLabel(value: number, label: unknown, lossWord: "손실" | "결손"): number {
+  const l = typeof label === "string" ? label : "";
+  const decisive = l.includes(lossWord) && !l.includes("이익");
+  return decisive && value > 0 ? -value : value;
 }
 
 function ext(fileName: string): string {
@@ -203,7 +236,7 @@ async function runExtraction(
       return {
         companyName: String(d.companyName ?? "").trim() || "unknown",
         revCurr: num(d.revCurr),
-        niCurr: num(d.niCurr),
+        niCurr: signByLabel(num(d.niCurr), d.niLabel, "손실"),
         revPrev: num(d.revPrev),
         niPrev: num(d.niPrev),
         cash: num(d.cash),
@@ -213,12 +246,15 @@ async function runExtraction(
         month: num(d.month),
         sga: num(d.sga),
         cogs: num(d.cogs),
-        operatingIncome: num(d.operatingIncome),
+        operatingIncome: signByLabel(num(d.operatingIncome), d.oiLabel, "손실"),
         currentAssets: num(d.currentAssets),
         currentLiabilities: num(d.currentLiabilities),
         totalAssets: num(d.totalAssets),
         totalLiabilities: num(d.totalLiabilities),
-        retainedEarnings: num(d.retainedEarnings),
+        retainedEarnings: signByLabel(num(d.retainedEarnings), d.reLabel, "결손"),
+        niLabel: String(d.niLabel ?? ""),
+        oiLabel: String(d.oiLabel ?? ""),
+        reLabel: String(d.reLabel ?? ""),
       };
     }
   }
