@@ -84,8 +84,10 @@ function Manual({
   return (
     <span
       className={cn(
-        "block text-muted-foreground",
-        !primary && "text-[10px] font-normal",
+        // 회색 10px 는 너무 안 읽혀 파랑+볼드로. 색이 추출값(검정)과 갈려
+        // 두 줄의 출처가 한눈에 구분된다.
+        "block font-semibold text-blue-600 dark:text-blue-400",
+        !primary && "text-[10px]",
         tone,
       )}
       title={hint}
@@ -116,8 +118,9 @@ function runwayClass(v: number | null): string {
   return v !== null && v < RUNWAY_ALERT ? RED : "";
 }
 // 수기 런웨이는 같은 기준을 쓰되 글자색으로만 — 추출값의 배경 음영과 구분한다.
+// 경고일 때만 기본색(파랑)을 빨강으로 덮는다.
 function manualRunwayClass(v: number | null): string {
-  return v !== null && v < RUNWAY_ALERT ? "text-rose-600" : "";
+  return v !== null && v < RUNWAY_ALERT ? "text-rose-600 dark:text-rose-400" : "";
 }
 // 월평균 차액(매출−지출) — 음수면 매달 현금이 줄어드는 중
 function surplusClass(v: number | null): string {
