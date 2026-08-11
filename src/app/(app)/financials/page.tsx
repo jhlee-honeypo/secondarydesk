@@ -45,6 +45,55 @@ function pct(v: number | null): string {
 function months(v: number | null): string {
   return v === null ? "흑자/충분" : `${v.toFixed(1)}개월`;
 }
+
+// ---- 수기값(분기보고 기입) 병기 --------------------------------------------
+// 재무제표에서 추출·계산한 값과 별개로, 기업이 분기보고 폼에 직접 적어 낸
+// 현금/월평균매출/월평균지출/런웨이/직원수가 slab 에 있다. 원천도 시점도 달라
+// 서로 어긋나는 게 정상이라 판정(gradeHealth)에는 쓰지 않고, 같은 칸 아래
+// 회색 보조 줄로만 보여준다.
+
+/** 추출값과 표기가 같으면 null — 같은 숫자를 두 번 쌓지 않는다. */
+function manualWon(manual: number | null, extracted: number | null): string | null {
+  if (manual === null) return null;
+  const s = formatWon(manual);
+  return extracted !== null && formatWon(extracted) === s ? null : s;
+}
+function manualMonths(manual: number | null, extracted: number | null): string | null {
+  if (manual === null) return null;
+  if (extracted !== null && Math.abs(manual - extracted) < 0.05) return null;
+  return Number.isInteger(manual) ? `${manual}개월` : `${manual.toFixed(1)}개월`;
+}
+function manualCount(manual: number | null, extracted: number | null): string | null {
+  return manual === null || manual === extracted ? null : `${manual}명`;
+}
+
+/** 수기값 한 줄. primary = 추출값이 없는 행(이 값이 그 칸의 유일한 내용).
+ *  tone = 경고 글자색(런웨이) — 추출값 쪽 배경 음영과 구분하려고 색만 바꾼다. */
+function Manual({
+  text,
+  hint,
+  primary = false,
+  tone,
+}: {
+  text: string | null;
+  hint: string;
+  primary?: boolean;
+  tone?: string;
+}) {
+  if (text === null) return primary ? <>—</> : null;
+  return (
+    <span
+      className={cn(
+        "block text-muted-foreground",
+        !primary && "text-[10px] font-normal",
+        tone,
+      )}
+      title={hint}
+    >
+      수 {text}
+    </span>
+  );
+}
 // slab 투자유치여부 영문 원문 → 한글
 const FUNDING_LABEL: Record<string, string> = {
   None: "없음",
@@ -60,9 +109,15 @@ const RED = "bg-rose-100 font-medium text-rose-700 dark:bg-rose-950/40 dark:text
 const YELLOW =
   "bg-amber-100 font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
 
-// 런웨이 3개월 미만 → 빨강
+const RUNWAY_ALERT = 3; // 개월 — 이 미만이면 런웨이 경고
+
+// 런웨이 3개월 미만 → 빨강(배경 음영)
 function runwayClass(v: number | null): string {
-  return v !== null && v < 3 ? RED : "";
+  return v !== null && v < RUNWAY_ALERT ? RED : "";
+}
+// 수기 런웨이는 같은 기준을 쓰되 글자색으로만 — 추출값의 배경 음영과 구분한다.
+function manualRunwayClass(v: number | null): string {
+  return v !== null && v < RUNWAY_ALERT ? "text-rose-600" : "";
 }
 // 월평균 차액(매출−지출) — 음수면 매달 현금이 줄어드는 중
 function surplusClass(v: number | null): string {
@@ -374,6 +429,7 @@ export default async function FinancialsPage({
     live: summarize(roster.filter((r) => !isExited(r.position ?? r.listing.status))),
   };
   const subLabel = subY > 0 ? `${subY}년 ${subM / 3}분기` : "";
+  const manualHint = `${subLabel ? subLabel + " " : ""}분기보고에 기업이 직접 기입한 값 (재무제표 추출값과 원천이 다름)`;
   const me = await getCurrentUser();
 
   return (
@@ -383,6 +439,10 @@ export default async function FinancialsPage({
           <h1 className="text-xl font-semibold">재무 점검</h1>
           <p className="text-sm text-muted-foreground">
             조합을 선택하면 소속 매물의 분기보고 제출 현황과 재무상태를 점검합니다.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            숫자 아래 회색 <b>수</b> 줄 = 기업이 분기보고에 직접 기입한 값(추출값과
+            같으면 생략).
           </p>
         </div>
         <FinancialsClient />
@@ -462,7 +522,12 @@ export default async function FinancialsPage({
                   </th>
                   <th className="px-3 py-2">손익</th>
                   <th className="px-3 py-2">투자유치</th>
-                  <th className="px-3 py-2 text-right">직원</th>
+                  <th
+                    className="px-3 py-2 text-right"
+                    title="분기보고에 기업이 기입한 직원 수 — 재무제표에서 추출하는 값이 아니다"
+                  >
+                    직원
+                  </th>
                   <th className="px-3 py-2">하이라이트</th>
                   <th
                     className="px-3 py-2 text-center"
@@ -571,11 +636,37 @@ export default async function FinancialsPage({
                         <td className="px-3 py-2 font-medium">{companyCell}</td>
                         <SubmissionCells sub={sub} slabUrl={slabUrl} />
                         <td className="px-3 py-2">—</td>
+                        {/* 재무제표가 없어도 기업이 기입한 수기값은 채운다 */}
+                        <td className="px-3 py-2 text-right">
+                          <Manual
+                            text={manualWon(slab?.currentCash ?? null, null)}
+                            hint={manualHint}
+                            primary
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Manual
+                            text={manualWon(slab?.runRate ?? null, null)}
+                            hint={manualHint}
+                            primary
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Manual
+                            text={manualWon(slab?.burnRate ?? null, null)}
+                            hint={manualHint}
+                            primary
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right">—</td>
-                        <td className="px-3 py-2 text-right">—</td>
-                        <td className="px-3 py-2 text-right">—</td>
-                        <td className="px-3 py-2 text-right">—</td>
-                        <td className="px-3 py-2 text-right">—</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          <Manual
+                            text={manualMonths(slab?.runway ?? null, null)}
+                            hint={manualHint}
+                            tone={manualRunwayClass(slab?.runway ?? null)}
+                            primary
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
                         <td className="px-3 py-2 text-right">—</td>
@@ -593,9 +684,11 @@ export default async function FinancialsPage({
                           )}
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap">
-                          {typeof slab?.headCount === "number"
-                            ? `${slab.headCount}명`
-                            : "—"}
+                          <Manual
+                            text={manualCount(slab?.headCount ?? null, null)}
+                            hint={manualHint}
+                            primary
+                          />
                         </td>
                         <td className="px-3 py-2 text-xs">
                           {slab?.businessHighlight ? (
@@ -645,12 +738,26 @@ export default async function FinancialsPage({
                           <BoardFileViewer fin={fin} />
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">{formatWon(metrics.heldCash)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatWon(metrics.heldCash)}
+                        <Manual
+                          text={manualWon(slab?.currentCash ?? null, metrics.heldCash)}
+                          hint={manualHint}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-right">
                         {formatWon(metrics.monthlyRevenue)}
+                        <Manual
+                          text={manualWon(slab?.runRate ?? null, metrics.monthlyRevenue)}
+                          hint={manualHint}
+                        />
                       </td>
                       <td className="px-3 py-2 text-right">
                         {formatWon(metrics.monthlySga)}
+                        <Manual
+                          text={manualWon(slab?.burnRate ?? null, metrics.monthlySga)}
+                          hint={manualHint}
+                        />
                       </td>
                       <td
                         className={cn(
@@ -667,6 +774,11 @@ export default async function FinancialsPage({
                         )}
                       >
                         {months(metrics.runwayMonths)}
+                        <Manual
+                          text={manualMonths(slab?.runway ?? null, metrics.runwayMonths)}
+                          hint={manualHint}
+                          tone={manualRunwayClass(slab?.runway ?? null)}
+                        />
                       </td>
                       <td
                         className={cn(
@@ -710,6 +822,10 @@ export default async function FinancialsPage({
                         {typeof fin.head_count === "number"
                           ? `${fin.head_count}명`
                           : "—"}
+                        <Manual
+                          text={manualCount(slab?.headCount ?? null, fin.head_count)}
+                          hint={manualHint}
+                        />
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {fin.business_highlight ? (
