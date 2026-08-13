@@ -173,6 +173,16 @@
   display: none;
 }
 
+/* 회수 전략 그룹 필터 — data-group 은 그룹 칸(quarter-group-select.tsx)에 붙는
+   클라이언트 상태라, 방금 찍은 그룹도 서버 왕복 없이 바로 필터에 반영된다.
+   미기입 행은 data-group="none". */
+[data-fin-view~="only-group-A"] tbody tr:not(:has([data-group="A"])),
+[data-fin-view~="only-group-B"] tbody tr:not(:has([data-group="B"])),
+[data-fin-view~="only-group-C"] tbody tr:not(:has([data-group="C"])),
+[data-fin-view~="only-group-none"] tbody tr:not(:has([data-group="none"])) {
+  display: none;
+}
+
 /* 미팅 대상으로 지정된 행(meeting-pin.tsx 의 핀이 켜짐) — 행 전체를 강조해
    목록에서 바로 눈에 들어오게 한다. 핀이 켜지면 서버 왕복 없이 즉시 반영된다. */
 tbody tr:has([data-meeting="1"]) {

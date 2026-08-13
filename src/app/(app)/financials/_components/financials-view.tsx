@@ -5,6 +5,24 @@ import { EyeOff, FileCheck, FileX, Pin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+  LISTING_GROUP_CODES,
+  LISTING_GROUP_LABEL,
+  LISTING_GROUP_SHORT,
+  type ListingGroupCode,
+} from "@/lib/types";
+
+// 그룹 필터 버튼의 선택 색 — quarter-group-select.tsx 의 버튼 색과 맞춘다.
+const GROUP_ON: Record<ListingGroupCode, string> = {
+  A: "border-emerald-600 bg-emerald-600 text-white",
+  B: "border-sky-600 bg-sky-600 text-white",
+  C: "border-orange-600 bg-orange-600 text-white",
+};
+const GROUP_OFF: Record<ListingGroupCode, string> = {
+  A: "text-emerald-700 dark:text-emerald-400",
+  B: "text-sky-700 dark:text-sky-400",
+  C: "text-orange-700 dark:text-orange-400",
+};
 
 export type FinancialsSummary = {
   submitted: number;
@@ -34,6 +52,8 @@ export function FinancialsView({
   const [only, setOnly] = useState<"submitted" | "unsubmitted" | null>(null);
   const [hideExited, setHideExited] = useState(false);
   const [onlyMeeting, setOnlyMeeting] = useState(false);
+  // 회수 전략 그룹 필터 — "none" 은 아직 기입 안 한 행만 보기.
+  const [onlyGroup, setOnlyGroup] = useState<ListingGroupCode | "none" | null>(null);
 
   // 카운트는 "가리기" 상태에 맞춰 바꿔 보여준다(제출/미제출 토글은 표만 걸러 카운트 유지).
   const s = summary && (hideExited ? summary.live : summary.all);
@@ -42,12 +62,15 @@ export function FinancialsView({
     only === "unsubmitted" && "only-unsubmitted",
     hideExited && "hide-exited",
     onlyMeeting && "only-meeting",
+    onlyGroup && `only-group-${onlyGroup}`,
   ]
     .filter(Boolean)
     .join(" ");
 
   const toggle = (next: "submitted" | "unsubmitted") =>
     setOnly((cur) => (cur === next ? null : next));
+  const toggleGroup = (next: ListingGroupCode | "none") =>
+    setOnlyGroup((cur) => (cur === next ? null : next));
 
   return (
     <div className="space-y-6" data-fin-view={view || undefined}>
@@ -136,6 +159,49 @@ export function FinancialsView({
               >
                 <Pin />
                 미팅 대상만
+              </button>
+            </Badge>
+
+            {/* 회수 전략 그룹 필터. 그룹은 클라이언트에서 바로 바뀌는 값이라
+                (핀과 같은 이유로) 개수는 붙이지 않는다. */}
+            <span className="w-2" />
+            {LISTING_GROUP_CODES.map((g) => (
+              <Badge
+                key={g}
+                asChild
+                variant="outline"
+                className={cn(
+                  "cursor-pointer",
+                  onlyGroup === g ? GROUP_ON[g] : GROUP_OFF[g],
+                )}
+              >
+                <button
+                  type="button"
+                  aria-pressed={onlyGroup === g}
+                  onClick={() => toggleGroup(g)}
+                  title={`${g} — ${LISTING_GROUP_LABEL[g]} 만 보기`}
+                >
+                  {g} {LISTING_GROUP_SHORT[g]}
+                </button>
+              </Badge>
+            ))}
+            <Badge
+              asChild
+              variant="outline"
+              className={cn(
+                "cursor-pointer",
+                onlyGroup === "none"
+                  ? "border-foreground bg-foreground text-background"
+                  : "text-muted-foreground",
+              )}
+            >
+              <button
+                type="button"
+                aria-pressed={onlyGroup === "none"}
+                onClick={() => toggleGroup("none")}
+                title="아직 이 분기 그룹을 기입하지 않은 기업만 보기"
+              >
+                그룹 미기입
               </button>
             </Badge>
 

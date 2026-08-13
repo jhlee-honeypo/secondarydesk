@@ -12,6 +12,7 @@ import {
   LISTING_STATUS_LABEL,
   LISTING_STATUS_VARIANT,
   type FinancialStatement,
+  type ListingGroupCode,
   type ListingStatus,
   type PositionStatus,
 } from "@/lib/types";
@@ -34,6 +35,7 @@ import {
 } from "./_components/financials-view";
 import { HealthBadge } from "./_components/health-badge";
 import { MeetingPin } from "./_components/meeting-pin";
+import { QuarterGroupSelect } from "./_components/quarter-group-select";
 import { FinancialHistory } from "./_components/financial-history";
 
 export const dynamic = "force-dynamic";
@@ -135,6 +137,10 @@ function erosionClass(v: number | null): string {
 // EXIT·상각(W/O) — 실 작업 대상이 아닌 상태(가리기 토글 대상)
 function isExited(status: ListingStatus | PositionStatus): boolean {
   return status === "EXIT" || status === "W/O";
+}
+// 직전 분기(3·6·9·12 누적월 기준) — 그룹 열이 이전 분기 판단을 함께 보여줄 때 쓴다.
+function prevQuarter(y: number, m: number): { y: number; m: number } {
+  return m === 3 ? { y: y - 1, m: 12 } : { y, m: m - 3 };
 }
 // 회사명 매칭용 정규화(법인격·공백·구두점 제거)
 function normName(s: string): string {
@@ -283,6 +289,9 @@ export default async function FinancialsPage({
     position: PositionStatus | null;
     // 미팅 대상 핀(메모의 리마인드 기록과 별개인 on/off 상태)
     meeting: boolean;
+    // 회수 전략 그룹(수기) — 이 분기 기입값과 직전 분기 기입값
+    group: ListingGroupCode | null;
+    prevGroup: ListingGroupCode | null;
   }[] = [];
   // 제출 현황을 볼 분기 — 선택한 분기, 미선택이면 slab 의 최신 분기
   let subY = selY;
@@ -363,6 +372,29 @@ export default async function FinancialsPage({
         if (!repByName.has(n)) repByName.set(n, r);
       }
 
+      // 회수 전략 그룹 — 당 분기와 직전 분기를 한 번에 읽는다. 연도·월을 따로
+      // in() 으로 걸면 (당 분기 연도, 직전 분기 월) 같은 조합도 딸려 오지만
+      // 아래에서 정확한 쌍만 골라 담으므로 문제되지 않는다.
+      const pq = prevQuarter(subY, subM);
+      const { data: groupRows } = subY
+        ? await supabase
+            .from("listing_quarter_groups")
+            .select("listing_id, report_year, report_month, group_code")
+            .in("listing_id", listingIds)
+            .in("report_year", [subY, pq.y])
+            .in("report_month", [subM, pq.m])
+        : { data: [] };
+
+      const groupByListing = new Map<string, ListingGroupCode>();
+      const prevGroupByListing = new Map<string, ListingGroupCode>();
+      for (const g of groupRows ?? []) {
+        const code = g.group_code as ListingGroupCode;
+        const id = g.listing_id as string;
+        if (g.report_year === subY && g.report_month === subM) groupByListing.set(id, code);
+        else if (g.report_year === pq.y && g.report_month === pq.m)
+          prevGroupByListing.set(id, code);
+      }
+
       const byBubble = new Map<string, FinancialStatement>();
       const byName = new Map<string, FinancialStatement>();
       for (const f of (finRows ?? []) as FinancialStatement[]) {
@@ -402,6 +434,8 @@ export default async function FinancialsPage({
             memoCount: memoCountByListing.get(l.id) ?? 0,
             position: positionByListing.get(l.id) ?? null,
             meeting: meetingListings.has(l.id),
+            group: groupByListing.get(l.id) ?? null,
+            prevGroup: prevGroupByListing.get(l.id) ?? null,
           };
         })
         // 분기보고 제출 기업이 상단, 미제출은 하단. 같은 그룹 안에서는 회사명순.
@@ -432,6 +466,8 @@ export default async function FinancialsPage({
     live: summarize(roster.filter((r) => !isExited(r.position ?? r.listing.status))),
   };
   const subLabel = subY > 0 ? `${subY}년 ${subM / 3}분기` : "";
+  const pv = prevQuarter(subY, subM);
+  const prevLabel = subY > 0 ? `${pv.y}년 ${pv.m / 3}분기` : "";
   const manualHint = `${subLabel ? subLabel + " " : ""}분기보고에 기업이 직접 기입한 값 (재무제표 추출값과 원천이 다름)`;
   const me = await getCurrentUser();
 
@@ -480,6 +516,15 @@ export default async function FinancialsPage({
                 <tr>
                   <th className="px-3 py-2">상태</th>
                   <th className="px-3 py-2">회사</th>
+                  <th
+                    className="px-3 py-2 text-center"
+                    title="회수 전략 그룹(사람이 판단해 기입) — A 즉시 회수·조기 배분 유력 / B 전략적 회수 가치 극대화 / C 리스크 관리·자산 효율화. 분기마다 따로 남고, 아래 회색 줄은 직전 분기 판단입니다."
+                  >
+                    그룹
+                    {subLabel && (
+                      <span className="block text-[10px] font-normal">{subLabel}</span>
+                    )}
+                  </th>
                   <th className="px-3 py-2 text-center">
                     분기보고
                     {subLabel && (
@@ -557,6 +602,8 @@ export default async function FinancialsPage({
                     memoCount,
                     position,
                     meeting,
+                    group,
+                    prevGroup,
                   }) => {
                   // 상단 요약 토글이 CSS 로 걸러 쓰는 표식(financials-view.tsx / globals.css)
                   const rowFlags = {
@@ -573,6 +620,25 @@ export default async function FinancialsPage({
                         count={memoCount}
                         currentUserId={me?.id ?? null}
                       />
+                    </td>
+                  );
+                  // 회수 전략 그룹 기입 칸. 분기가 정해지지 않은 화면(slab 분기보고가
+                  // 하나도 없을 때)에서는 어느 분기에 저장할지 알 수 없어 비운다.
+                  const groupCell = (
+                    <td className="px-3 py-2 text-center">
+                      {subY > 0 ? (
+                        <QuarterGroupSelect
+                          listingId={listing.id}
+                          companyName={listing.company_name}
+                          year={subY}
+                          month={subM}
+                          initial={group}
+                          previous={prevGroup}
+                          prevLabel={prevLabel}
+                        />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   );
                   const meetingCell = (
@@ -637,6 +703,7 @@ export default async function FinancialsPage({
                           </Badge>
                         </td>
                         <td className="px-3 py-2 font-medium">{companyCell}</td>
+                        {groupCell}
                         <SubmissionCells sub={sub} slabUrl={slabUrl} />
                         <td className="px-3 py-2">—</td>
                         {/* 재무제표가 없어도 기업이 기입한 수기값은 채운다 */}
@@ -729,6 +796,7 @@ export default async function FinancialsPage({
                         />
                       </td>
                       <td className="px-3 py-2 font-medium">{companyCell}</td>
+                      {groupCell}
                       <SubmissionCells sub={sub} slabUrl={slabUrl} />
                       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                         {fin.report_year} · {fin.report_month / 3}분기
