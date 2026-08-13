@@ -182,14 +182,16 @@ export const LISTING_STATUS_LABEL: Record<ListingStatus, string> = {
 export type PositionStatus = "LIVE" | "EXIT" | "W/O";
 
 // 분기별 회수 전략 그룹(listing_quarter_groups) — 재무 점검 탭에서 사람이 기입한다.
-export type ListingGroupCode = "A" | "B" | "C";
+// '-' 는 EXIT·상각처럼 A/B/C 판단 대상이 아닌 기업 표시 — 공란(미기입)과 다르다.
+export type ListingGroupCode = "A" | "B" | "C" | "-";
 
-export const LISTING_GROUP_CODES: ListingGroupCode[] = ["A", "B", "C"];
+export const LISTING_GROUP_CODES: ListingGroupCode[] = ["A", "B", "C", "-"];
 
 export const LISTING_GROUP_LABEL: Record<ListingGroupCode, string> = {
   A: "즉시 회수 및 조기 배분 유력 자산",
   B: "전략적 회수 가치 극대화 자산",
   C: "리스크 관리 및 자산 효율화 자산",
+  "-": "해당 없음 (EXIT·상각 등 판단 대상 아님)",
 };
 
 // 좁은 칸(필터 버튼·툴팁)용 축약 라벨.
@@ -197,6 +199,7 @@ export const LISTING_GROUP_SHORT: Record<ListingGroupCode, string> = {
   A: "즉시 회수",
   B: "가치 극대화",
   C: "리스크 관리",
+  "-": "해당 없음",
 };
 
 // §4.5 HoldingFund.status (마이그레이션 20260609000002 로 enum 재정의됨)

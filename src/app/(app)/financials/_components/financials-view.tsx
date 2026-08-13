@@ -17,12 +17,20 @@ const GROUP_ON: Record<ListingGroupCode, string> = {
   A: "border-emerald-600 bg-emerald-600 text-white",
   B: "border-sky-600 bg-sky-600 text-white",
   C: "border-orange-600 bg-orange-600 text-white",
+  "-": "border-slate-500 bg-slate-500 text-white",
 };
 const GROUP_OFF: Record<ListingGroupCode, string> = {
   A: "text-emerald-700 dark:text-emerald-400",
   B: "text-sky-700 dark:text-sky-400",
   C: "text-orange-700 dark:text-orange-400",
+  "-": "text-slate-600 dark:text-slate-400",
 };
+
+// '-' 를 그대로 클래스 이름에 붙이면 only-group-- 가 되어 읽기 어렵다 → na 로 바꾼다
+// (globals.css 의 선택자와 맞물린다).
+function viewToken(g: ListingGroupCode | "none"): string {
+  return g === "-" ? "na" : g;
+}
 
 export type FinancialsSummary = {
   submitted: number;
@@ -62,7 +70,7 @@ export function FinancialsView({
     only === "unsubmitted" && "only-unsubmitted",
     hideExited && "hide-exited",
     onlyMeeting && "only-meeting",
-    onlyGroup && `only-group-${onlyGroup}`,
+    onlyGroup && `only-group-${viewToken(onlyGroup)}`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -73,7 +81,12 @@ export function FinancialsView({
     setOnlyGroup((cur) => (cur === next ? null : next));
 
   return (
-    <div className="space-y-6" data-fin-view={view || undefined}>
+    // 표 카드가 남은 높이를 다 쓰고 그 안에서 스크롤되도록 flex 사슬을 잇는다
+    // (page.tsx 가 뷰포트 높이로 고정 → 여기 flex-1 → 표 카드 flex-1 + overflow-auto).
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-6"
+      data-fin-view={view || undefined}
+    >
       <div className="flex flex-wrap items-center gap-3">
         {filters}
         {s && (

@@ -472,7 +472,10 @@ export default async function FinancialsPage({
   const me = await getCurrentUser();
 
   return (
-    <div className="space-y-6">
+    // 표가 화면 밖으로 넘치는 대신 카드 안에서 스크롤되도록 페이지 높이를 뷰포트에
+    // 맞춰 고정한다(뷰포트 − 상단바 3.5rem − main 의 상하 padding 3rem). 그래야
+    // 가로 스크롤바가 늘 화면 하단에 보이고, 표 머리글도 sticky 로 붙일 수 있다.
+    <div className="flex h-[calc(100svh-6.5rem)] flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">재무 점검</h1>
@@ -507,18 +510,22 @@ export default async function FinancialsPage({
             이 조합에 연결된 매물이 없습니다.
           </Card>
         ) : (
-          <Card className="overflow-x-auto p-0">
+          <Card className="min-h-0 flex-1 overflow-auto p-0">
             <table className="w-full text-sm">
               {/* whitespace-nowrap 은 상속되므로 thead 에 한 번 걸어 모든 머리글의
                   단어 중간 줄바꿈을 막는다. 좁은 열의 긴 이름만 TwoLine 으로
-                  의미 단위에서 두 줄로 끊는다(최대 2줄). */}
-              <thead className="border-b bg-muted/40 text-left text-xs whitespace-nowrap text-muted-foreground">
+                  의미 단위에서 두 줄로 끊는다(최대 2줄).
+                  sticky = 세로로 내려도 머리글이 붙어 있게. 아래 행이 비쳐 보이면
+                  안 되므로 반투명(bg-muted/40) 대신 불투명 배경을 쓰고, 밑줄은
+                  thead 가 아니라 th 에 건다(border-collapse 표에서 sticky 요소의
+                  테두리는 같이 스크롤돼 사라진다). */}
+              <thead className="sticky top-0 z-20 bg-muted text-left text-xs whitespace-nowrap text-muted-foreground [&_th]:border-b">
                 <tr>
                   <th className="px-3 py-2">상태</th>
                   <th className="px-3 py-2">회사</th>
                   <th
                     className="px-3 py-2 text-center"
-                    title="회수 전략 그룹(사람이 판단해 기입) — A 즉시 회수·조기 배분 유력 / B 전략적 회수 가치 극대화 / C 리스크 관리·자산 효율화. 분기마다 따로 남고, 아래 회색 줄은 직전 분기 판단입니다."
+                    title="회수 전략 그룹(사람이 판단해 기입) — A 즉시 회수·조기 배분 유력 / B 전략적 회수 가치 극대화 / C 리스크 관리·자산 효율화 / - 해당 없음(EXIT·상각). 분기마다 따로 남고, 아래 회색 줄은 직전 분기 판단입니다."
                   >
                     그룹
                     {subLabel && (

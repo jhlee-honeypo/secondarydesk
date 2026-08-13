@@ -12,7 +12,7 @@ import { setQuarterGroup } from "../group-actions";
 
 // 그룹별 색. 건강도 배지(위험 rose / 주의 amber / 양호 emerald)와 헷갈리지 않게
 // 세 색 모두 다른 계열로 잡았다.
-// 선택 안 한 버튼은 회색이고, hover 때만 그 그룹 색을 보여준다(칸이 좁아 세 개가
+// 선택 안 한 버튼은 회색이고, hover 때만 그 그룹 색을 보여준다(칸이 좁아 네 개가
 // 동시에 색을 갖고 있으면 어느 게 찍힌 건지 안 보인다).
 const TONE: Record<ListingGroupCode, { on: string; off: string; text: string }> = {
   A: {
@@ -30,9 +30,17 @@ const TONE: Record<ListingGroupCode, { on: string; off: string; text: string }> 
     off: "hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-950/50 dark:hover:text-orange-400",
     text: "text-orange-700 dark:text-orange-400",
   },
+  // 해당 없음(EXIT·상각) — 판단 대상이 아니라는 표시라 눈에 덜 띄는 회색으로.
+  "-": {
+    on: "bg-slate-500 text-white",
+    off: "hover:bg-muted hover:text-foreground",
+    text: "text-slate-600 dark:text-slate-400",
+  },
 };
 
-/** 분기별 회수 전략 그룹 기입 칸 — A/B/C 세 버튼(선택된 걸 다시 누르면 해제).
+/** 분기별 회수 전략 그룹 기입 칸 — A/B/C/- 네 버튼(선택된 걸 다시 누르면 해제).
+ *  '-' 는 EXIT·상각처럼 판단 대상이 아닌 기업을 찍어 두는 값이라, 아무것도 안 찍은
+ *  공란과 다르다(필터에서도 '그룹 미기입'과 따로 걸린다).
  *
  *  기본은 공란(미기입)이고 자동 승계도 없다. 대신 이전 분기에 뭐라고 봤는지를
  *  버튼 아래 회색 줄로 함께 보여줘, 당 분기를 찍을 때 바로 대조할 수 있게 한다.
