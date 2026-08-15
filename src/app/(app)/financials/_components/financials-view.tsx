@@ -48,11 +48,9 @@ export type FinancialsSummary = {
  *  data-fin-view + globals.css 로 행만 숨긴다(즉시 반응, 재조회 없음).
  *  숨김 조건은 각 행의 data-sub / data-exited 속성(page.tsx)과 맞물린다. */
 export function FinancialsView({
-  filters,
   summary,
   children,
 }: {
-  filters: ReactNode;
   /** 조합 미선택 시 null — 요약/필터 버튼을 감춘다. */
   summary: { all: FinancialsSummary; live: FinancialsSummary } | null;
   children: ReactNode;
@@ -84,150 +82,147 @@ export function FinancialsView({
     // 표 카드가 남은 높이를 다 쓰고 그 안에서 스크롤되도록 flex 사슬을 잇는다
     // (page.tsx 가 뷰포트 높이로 고정 → 여기 flex-1 → 표 카드 flex-1 + overflow-auto).
     <div
-      className="flex min-h-0 flex-1 flex-col gap-6"
+      className="flex min-h-0 flex-1 flex-col gap-3"
       data-fin-view={view || undefined}
     >
-      <div className="flex flex-wrap items-center gap-3">
-        {filters}
-        {s && (
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge
-              asChild
-              variant="outline"
-              className={cn(
-                "cursor-pointer",
-                only === "submitted"
-                  ? "border-emerald-600 bg-emerald-600 text-white"
-                  : "text-emerald-600",
-              )}
+      {s && (
+        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              only === "submitted"
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "text-emerald-600",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={only === "submitted"}
+              onClick={() => toggle("submitted")}
+              title="분기보고를 제출한 기업만 보기"
             >
-              <button
-                type="button"
-                aria-pressed={only === "submitted"}
-                onClick={() => toggle("submitted")}
-                title="분기보고를 제출한 기업만 보기"
-              >
-                <FileCheck />
-                제출 {s.submitted}
-              </button>
-            </Badge>
-            <Badge
-              asChild
-              variant="outline"
-              className={cn(
-                "cursor-pointer",
-                only === "unsubmitted"
-                  ? "border-rose-500 bg-rose-500 text-white"
-                  : "text-rose-500",
-              )}
+              <FileCheck />
+              제출 {s.submitted}
+            </button>
+          </Badge>
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              only === "unsubmitted"
+                ? "border-rose-500 bg-rose-500 text-white"
+                : "text-rose-500",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={only === "unsubmitted"}
+              onClick={() => toggle("unsubmitted")}
+              title="분기보고 미제출 기업만 보기"
             >
-              <button
-                type="button"
-                aria-pressed={only === "unsubmitted"}
-                onClick={() => toggle("unsubmitted")}
-                title="분기보고 미제출 기업만 보기"
-              >
-                <FileX />
-                미제출 {s.unsubmitted}
-              </button>
-            </Badge>
+              <FileX />
+              미제출 {s.unsubmitted}
+            </button>
+          </Badge>
 
-            <Badge
-              asChild
-              variant="outline"
-              className={cn(
-                "cursor-pointer",
-                hideExited
-                  ? "border-foreground bg-foreground text-background"
-                  : "text-muted-foreground",
-              )}
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              hideExited
+                ? "border-foreground bg-foreground text-background"
+                : "text-muted-foreground",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={hideExited}
+              onClick={() => setHideExited((v) => !v)}
+              title="이 조합에서 EXIT·상각(W/O)한 기업을 목록에서 가린다"
             >
-              <button
-                type="button"
-                aria-pressed={hideExited}
-                onClick={() => setHideExited((v) => !v)}
-                title="이 조합에서 EXIT·상각(W/O)한 기업을 목록에서 가린다"
-              >
-                <EyeOff />
-                W/O·EXIT 가리기
-              </button>
-            </Badge>
-            {/* 핀으로 표시한 미팅 대상만 남긴다. 핀은 클라이언트 상태라 개수를
-                서버가 알 수 없어 숫자는 붙이지 않는다. */}
-            <Badge
-              asChild
-              variant="outline"
-              className={cn(
-                "cursor-pointer",
-                onlyMeeting
-                  ? "border-amber-500 bg-amber-500 text-white"
-                  : "text-amber-600",
-              )}
+              <EyeOff />
+              W/O·EXIT 가리기
+            </button>
+          </Badge>
+          {/* 핀으로 표시한 미팅 대상만 남긴다. 핀은 클라이언트 상태라 개수를
+              서버가 알 수 없어 숫자는 붙이지 않는다. */}
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              onlyMeeting
+                ? "border-amber-500 bg-amber-500 text-white"
+                : "text-amber-600",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={onlyMeeting}
+              onClick={() => setOnlyMeeting((v) => !v)}
+              title="핀으로 지정한 미팅 대상 기업만 보기"
             >
-              <button
-                type="button"
-                aria-pressed={onlyMeeting}
-                onClick={() => setOnlyMeeting((v) => !v)}
-                title="핀으로 지정한 미팅 대상 기업만 보기"
-              >
-                <Pin />
-                미팅 대상만
-              </button>
-            </Badge>
+              <Pin />
+              미팅 대상만
+            </button>
+          </Badge>
 
-            {/* 회수 전략 그룹 필터. 그룹은 클라이언트에서 바로 바뀌는 값이라
-                (핀과 같은 이유로) 개수는 붙이지 않는다. */}
-            <span className="w-2" />
-            {LISTING_GROUP_CODES.map((g) => (
-              <Badge
-                key={g}
-                asChild
-                variant="outline"
-                className={cn(
-                  "cursor-pointer",
-                  onlyGroup === g ? GROUP_ON[g] : GROUP_OFF[g],
-                )}
-              >
-                <button
-                  type="button"
-                  aria-pressed={onlyGroup === g}
-                  onClick={() => toggleGroup(g)}
-                  title={`${g} — ${LISTING_GROUP_LABEL[g]} 만 보기`}
-                >
-                  {g} {LISTING_GROUP_SHORT[g]}
-                </button>
-              </Badge>
-            ))}
+          {/* 회수 전략 그룹 필터. 그룹은 클라이언트에서 바로 바뀌는 값이라
+              (핀과 같은 이유로) 개수는 붙이지 않는다. */}
+          <span className="w-2" />
+          {LISTING_GROUP_CODES.map((g) => (
             <Badge
+              key={g}
               asChild
               variant="outline"
               className={cn(
                 "cursor-pointer",
-                onlyGroup === "none"
-                  ? "border-foreground bg-foreground text-background"
-                  : "text-muted-foreground",
+                onlyGroup === g ? GROUP_ON[g] : GROUP_OFF[g],
               )}
             >
               <button
                 type="button"
-                aria-pressed={onlyGroup === "none"}
-                onClick={() => toggleGroup("none")}
-                title="아직 이 분기 그룹을 기입하지 않은 기업만 보기"
+                aria-pressed={onlyGroup === g}
+                onClick={() => toggleGroup(g)}
+                title={`${g} — ${LISTING_GROUP_LABEL[g]} 만 보기`}
               >
-                그룹 미기입
+                {g} {LISTING_GROUP_SHORT[g]}
               </button>
             </Badge>
+          ))}
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              onlyGroup === "none"
+                ? "border-foreground bg-foreground text-background"
+                : "text-muted-foreground",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={onlyGroup === "none"}
+              onClick={() => toggleGroup("none")}
+              title="아직 이 분기 그룹을 기입하지 않은 기업만 보기"
+            >
+              그룹 미기입
+            </button>
+          </Badge>
 
-            <span className="w-2" />
-            <Badge variant="destructive">위험 {s.danger}</Badge>
-            <Badge variant="secondary">주의 {s.warning}</Badge>
-            <Badge variant="outline">양호 {s.good}</Badge>
-            <Badge variant="outline" className="text-muted-foreground">
-              데이터 없음 {s.none}
-            </Badge>
-          </div>
-        )}
-      </div>
+          <span className="w-2" />
+          <Badge variant="destructive">위험 {s.danger}</Badge>
+          <Badge variant="secondary">주의 {s.warning}</Badge>
+          <Badge variant="outline">양호 {s.good}</Badge>
+          <Badge variant="outline" className="text-muted-foreground">
+            데이터 없음 {s.none}
+          </Badge>
+        </div>
+      )}
 
       {children}
     </div>

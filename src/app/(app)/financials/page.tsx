@@ -475,32 +475,29 @@ export default async function FinancialsPage({
     // 표가 화면 밖으로 넘치는 대신 카드 안에서 스크롤되도록 페이지 높이를 뷰포트에
     // 맞춰 고정한다(뷰포트 − 상단바 3.5rem − main 의 상하 padding 3rem). 그래야
     // 가로 스크롤바가 늘 화면 하단에 보이고, 표 머리글도 sticky 로 붙일 수 있다.
-    <div className="flex h-[calc(100svh-6.5rem)] flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">재무 점검</h1>
-          <p className="text-sm text-muted-foreground">
-            조합을 선택하면 소속 매물의 분기보고 제출 현황과 재무상태를 점검합니다.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            숫자 아래 회색 <b>수</b> 줄 = 기업이 분기보고에 직접 기입한 값(추출값과
-            같으면 생략).
-          </p>
+    <div className="flex h-[calc(100svh-6.5rem)] flex-col gap-3">
+      {/* 상단 고정 영역은 한 줄로 눌러 둔다 — 이 페이지에서 정작 봐야 하는 건
+          아래 표라, 제목·조합/분기 선택·수기값 안내·가져오기를 한 행에 모은다. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h1 className="text-lg font-semibold">재무 점검</h1>
+        <FinancialsFilters
+          funds={fundOptions}
+          periods={periodOptions}
+          fund={fund}
+          period={period}
+        />
+        <span
+          className="text-xs whitespace-nowrap text-muted-foreground"
+          title="기업이 분기보고에 직접 기입한 값 — 재무제표 추출값과 원천이 달라, 추출값과 다를 때만 아래 줄에 표시합니다."
+        >
+          숫자 아래 <b className="text-blue-600 dark:text-blue-400">수</b> 줄 = 분기보고 기입값
+        </span>
+        <div className="ml-auto">
+          <FinancialsClient />
         </div>
-        <FinancialsClient />
       </div>
 
-      <FinancialsView
-        filters={
-          <FinancialsFilters
-            funds={fundOptions}
-            periods={periodOptions}
-            fund={fund}
-            period={period}
-          />
-        }
-        summary={fund ? summary : null}
-      >
+      <FinancialsView summary={fund ? summary : null}>
         {!fund ? (
           <Card className="p-10 text-center text-sm text-muted-foreground">
             상단에서 <b>조합</b>을 선택하면 소속 매물 목록과 재무상태가 표시됩니다.
