@@ -92,11 +92,21 @@ npm run dev
 스키마·RLS 정책은 [`supabase/migrations/`](./supabase/migrations) 에 SQL 로 정의돼 있다.
 **파일명 순서대로** 적용한다.
 
-- **방법 A — SQL Editor(권장, 비개발자용)**: Supabase 대시보드 > **SQL Editor** 에서
-  마이그레이션 파일을 파일명 순서대로 붙여넣고 차례로 실행.
-- **방법 B — Supabase CLI**: `supabase link` 후 `supabase db push`
+- **방법 A — Supabase CLI(권장)**: CLI 는 devDependency 로 들어 있다(`npx supabase`).
+  처음 한 번만 **일반 터미널**에서 `npx supabase login`(브라우저 승인) + `npx supabase
+  link --project-ref <ref>` 를 하고, 이후 새 마이그레이션은 `npx supabase db push`.
+  `--dry-run` 으로 무엇이 적용될지 먼저 확인할 수 있다.
+- **방법 B — SQL Editor(비개발자용)**: 대시보드 > **SQL Editor** 에 파일명 순서대로
+  붙여넣고 차례로 실행. ⚠️ 이렇게 적용하면 CLI 의 이력 테이블에는 남지 않아,
+  나중에 `db push` 가 그 파일을 다시 실행하려 든다. 섞어 쓰지 말 것
+  (섞였다면 `npx supabase migration repair --status applied <version…>` 으로
+  실행 없이 기록만 맞춘다 — 2026-08-17 에 기존 37개를 이 방법으로 정리했다).
 
-적용 확인: **Table Editor** 에 테이블들이 보이고, 각 테이블에 **RLS enabled** 표시.
+적용 확인: `npx supabase migration list` 의 Local/Remote 열이 같고, **Table Editor** 에
+테이블이 보이며 각 테이블에 **RLS enabled** 표시.
+
+파일명 = 버전(앞 14자리)이고 이력 테이블의 PK 라 **중복되면 안 된다**. 새 파일은
+`YYYYMMDDHHMMSS_이름.sql` 로, 기존 파일과 겹치지 않는 시각으로 만든다.
 
 ### 5. 인증 (승인제)
 

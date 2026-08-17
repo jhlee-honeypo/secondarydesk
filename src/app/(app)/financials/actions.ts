@@ -38,6 +38,8 @@ export type ReviewRow = {
   total_assets: number;
   total_liabilities: number;
   retained_earnings: number;
+  // 표기 통화(ISO 4217) — 추출 시 문서에서 판별. KRW 면 화면에 기호를 붙이지 않는다.
+  currency: string;
   source: "upload" | "slab";
   source_file: string | null;
   source_file_url: string | null;
@@ -97,6 +99,7 @@ function toRow(
     total_assets: d.totalAssets,
     total_liabilities: d.totalLiabilities,
     retained_earnings: d.retainedEarnings,
+    currency: d.currency,
     source: base.source,
     source_file: base.source_file ?? null,
     source_file_url: base.source_file_url ?? null,
@@ -141,6 +144,8 @@ function mergeRows(rows: ReviewRow[]): ReviewRow[] {
       total_assets: pickNonZero(prev.total_assets, r.total_assets),
       total_liabilities: pickNonZero(prev.total_liabilities, r.total_liabilities),
       retained_earnings: pickNonZero(prev.retained_earnings, r.retained_earnings),
+      // 한쪽 파일만 통화가 읽혔을 수 있다 — 외화로 읽힌 쪽을 택한다(mergeExtracted 와 동일 규칙).
+      currency: prev.currency !== "KRW" ? prev.currency : r.currency,
     });
   }
   return [...byKey.values()];
@@ -326,6 +331,7 @@ export async function saveFinancials(rows: ReviewRow[]): Promise<SaveResult> {
     total_assets: r.total_assets,
     total_liabilities: r.total_liabilities,
     retained_earnings: r.retained_earnings,
+    currency: r.currency,
     source: r.source,
     source_file: r.source_file,
     // 영구 보기 가능한 http(s) URL 만 저장(여러 개면 줄바꿈). blob: 등 임시 URL 제외.

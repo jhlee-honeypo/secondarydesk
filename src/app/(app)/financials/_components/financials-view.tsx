@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { EyeOff, FileCheck, FileX, Pin } from "lucide-react";
+import { EyeOff, FileCheck, FileWarning, FileX, Pin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,7 @@ export function FinancialsView({
   const [only, setOnly] = useState<"submitted" | "unsubmitted" | null>(null);
   const [hideExited, setHideExited] = useState(false);
   const [onlyMeeting, setOnlyMeeting] = useState(false);
+  const [onlyReview, setOnlyReview] = useState(false);
   // 회수 전략 그룹 필터 — "none" 은 아직 기입 안 한 행만 보기.
   const [onlyGroup, setOnlyGroup] = useState<ListingGroupCode | "none" | null>(null);
 
@@ -68,6 +69,7 @@ export function FinancialsView({
     only === "unsubmitted" && "only-unsubmitted",
     hideExited && "hide-exited",
     onlyMeeting && "only-meeting",
+    onlyReview && "only-review",
     onlyGroup && `only-group-${viewToken(onlyGroup)}`,
   ]
     .filter(Boolean)
@@ -168,6 +170,29 @@ export function FinancialsView({
             >
               <Pin />
               미팅 대상만
+            </button>
+          </Badge>
+          {/* 추출값이 틀려 고쳐야 하는 행만 남긴다(확인 열의 표시). 미팅 핀과 색·
+              아이콘을 갈라 둔다 — 만나야 하는 기업(amber 핀)과 고쳐야 하는 데이터
+              (violet 파일 경고)는 다른 일이다. 개수는 핀과 같은 이유로 안 붙인다. */}
+          <Badge
+            asChild
+            variant="outline"
+            className={cn(
+              "cursor-pointer",
+              onlyReview
+                ? "border-violet-600 bg-violet-600 text-white"
+                : "text-violet-600 dark:text-violet-400",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed={onlyReview}
+              onClick={() => setOnlyReview((v) => !v)}
+              title="추출값 확인 필요로 표시한 분기 데이터만 보기 (재무제표 오업로드 등)"
+            >
+              <FileWarning />
+              확인 필요만
             </button>
           </Badge>
 

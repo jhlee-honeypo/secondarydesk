@@ -1,0 +1,9 @@
+# Supabase CLI 로컬 산출물 — 커밋하지 않는다.
+# .temp 에는 연결된 프로젝트 ref·풀러 URL 같은 로컬 상태가 들어간다.
+.branches
+.temp
+
+# 로컬 전용 환경파일
+.env
+.env.local
+.env.*.local

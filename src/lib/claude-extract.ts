@@ -43,6 +43,10 @@ const SYSTEM_PROMPT = [
   "19. niLabel (string): the bottom-line label EXACTLY as printed, spaces removed (e.g. '당기순이익', '당기순손실', '당기순손익'). Empty string if the document has no such line.",
   "20. oiLabel (string): the 영업이익/영업손실/영업손익 line label exactly as printed, spaces removed. Empty string if absent.",
   "21. reLabel (string): the 이익잉여금/결손금 line label exactly as printed, spaces removed (e.g. '이익잉여금', '결손금', '이익잉여금(결손금)'). Empty string if absent.",
+  "22. currency (string): ISO 4217 code of the currency the figures are denominated in — the document's own currency, NOT converted.",
+  "   - Evidence to read: the unit note ('단위: 원', '단위: 천원', 'In thousands of USD', 'Amounts in NT$'), column headers, and currency symbols next to figures.",
+  "   - Mapping: 원/₩/KRW → 'KRW'. US$/USD/$ → 'USD'. NT$/New Taiwan Dollar → 'TWD'. S$/SGD → 'SGD'. ¥/円/JPY → 'JPY'. RMB/CNY/元 → 'CNY'. €/EUR → 'EUR'. £/GBP → 'GBP'. HK$ → 'HKD'.",
+  "   - A Korean-language statement with no currency marking → 'KRW'. If truly indeterminable → 'KRW'.",
   "",
   "SIGN RULES (critical — Korean statements RENAME the line by outcome, so the label decides the sign):",
   "- The same line is titled 당기순이익 when profitable and 당기순손실 when loss-making; likewise 영업이익/영업손실 and 이익잉여금/결손금. Read the label first, then the digits.",
@@ -56,7 +60,8 @@ const SYSTEM_PROMPT = [
   "",
   "RULES:",
   "- Missing value: use 0.",
-  "- 천원 multiply 1000, 백만원 multiply 1000000.",
+  "- 천원 multiply 1000, 백만원 multiply 1000000. The same applies in any currency: 'in thousands' multiply 1000, 'in millions' multiply 1000000 — always output the base-currency amount.",
+  "- NEVER convert currencies. If the statement is in USD (or any non-KRW currency), output the USD figures as printed and report that currency in the currency field. Do not apply an exchange rate.",
   "- CONSOLIDATED PRIORITY: If the document is a 연결재무제표/연결손익계산서 (consolidated) or shows both 별도(separate) and 연결(consolidated) figures, ALWAYS use the 연결(consolidated) figures (지배기업+종속기업 합산). Only fall back to 별도 figures when no consolidated figures exist.",
   "- No thousand separators in output.",
   "- If document is only 재무상태표 (balance sheet), set revCurr/niCurr/revPrev/niPrev/sga/cogs/operatingIncome to 0.",
@@ -95,6 +100,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       niLabel: { type: "string" },
       oiLabel: { type: "string" },
       reLabel: { type: "string" },
+      currency: { type: "string" },
     },
     required: [
       "companyName",
@@ -118,6 +124,7 @@ const EXTRACTION_TOOL: Anthropic.Tool = {
       "niLabel",
       "oiLabel",
       "reLabel",
+      "currency",
     ],
   },
 };
@@ -145,6 +152,8 @@ export type ExtractedFinancials = {
   niLabel: string;
   oiLabel: string;
   reLabel: string;
+  // 문서에 적힌 표기 통화(ISO 4217). 값은 이 통화 그대로 — 환산하지 않는다.
+  currency: string;
 };
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -161,6 +170,38 @@ function signByLabel(value: number, label: unknown, lossWord: "손실" | "결손
   const l = typeof label === "string" ? label : "";
   const decisive = l.includes(lossWord) && !l.includes("이익");
   return decisive && value > 0 ? -value : value;
+}
+
+// 통화 기호·표기를 ISO 4217 3자리로. 모델이 코드 대신 기호를 낼 수 있고, DB 는
+// ^[A-Z]{3}$ 만 받으므로 여기서 정규화한다. 판별 불가·미표기는 원화(기존 동작).
+const CURRENCY_ALIAS: Record<string, string> = {
+  "₩": "KRW",
+  원: "KRW",
+  $: "USD",
+  US$: "USD",
+  USD$: "USD",
+  NT$: "TWD",
+  NTD: "TWD",
+  S$: "SGD",
+  "¥": "JPY",
+  円: "JPY",
+  元: "CNY",
+  RMB: "CNY",
+  "€": "EUR",
+  "£": "GBP",
+  HK$: "HKD",
+};
+
+export function normCurrency(v: unknown): string {
+  const raw = String(v ?? "").trim();
+  if (!raw) return "KRW";
+  const upper = raw.toUpperCase();
+  if (/^[A-Z]{3}$/.test(upper)) return upper;
+  const alias = CURRENCY_ALIAS[upper] ?? CURRENCY_ALIAS[raw];
+  if (alias) return alias;
+  // 'USD (in thousands)' 같은 서술형에서 코드만 건져낸다.
+  const m = /\b(KRW|USD|TWD|SGD|JPY|CNY|EUR|GBP|HKD|VND|INR|AUD|CAD|CHF)\b/.exec(upper);
+  return m ? m[1] : "KRW";
 }
 
 function ext(fileName: string): string {
@@ -255,35 +296,102 @@ async function runExtraction(
         niLabel: String(d.niLabel ?? ""),
         oiLabel: String(d.oiLabel ?? ""),
         reLabel: String(d.reLabel ?? ""),
+        currency: normCurrency(d.currency),
       };
     }
   }
   throw new Error("추출 결과 없음 (tool_use 블록 누락)");
 }
 
-/** 파일(bytes) 한 건에서 재무 11개 값 추출 — 형식(PDF/이미지/엑셀)에 맞게 라우팅. */
+/** 파일(bytes)을 Claude 콘텐츠 블록으로 — 형식(PDF/이미지/엑셀)에 맞게 라우팅. */
+function toFileBlock(
+  bytes: Uint8Array,
+  mediaType: string,
+  fileName: string,
+): Anthropic.ContentBlockParam {
+  if (isXlsx(mediaType, fileName)) {
+    return {
+      type: "text",
+      text: `다음은 엑셀로 제출된 재무제표를 시트별 CSV 로 변환한 것이다. 이 표에서 값을 추출하라.\n\n${xlsxToText(bytes)}`,
+    };
+  }
+  const base64 = Buffer.from(bytes).toString("base64");
+  if (isImageFile(mediaType, fileName)) {
+    return {
+      type: "image",
+      source: { type: "base64", media_type: imageMediaType(mediaType, fileName), data: base64 },
+    };
+  }
+  // 그 외(불명확 content-type 포함)는 PDF 문서로 처리
+  return {
+    type: "document",
+    source: { type: "base64", media_type: "application/pdf", data: base64 },
+  };
+}
+
+/** 파일(bytes) 한 건에서 재무 값 전체 추출. */
 export async function extractFromFile(
   bytes: Uint8Array,
   mediaType: string,
   fileName: string,
 ): Promise<ExtractedFinancials> {
-  if (isXlsx(mediaType, fileName)) {
-    const text = xlsxToText(bytes);
-    return runExtraction({
-      type: "text",
-      text: `다음은 엑셀로 제출된 재무제표를 시트별 CSV 로 변환한 것이다. 이 표에서 값을 추출하라.\n\n${text}`,
-    });
-  }
-  const base64 = Buffer.from(bytes).toString("base64");
-  if (isImageFile(mediaType, fileName)) {
-    return runExtraction({
-      type: "image",
-      source: { type: "base64", media_type: imageMediaType(mediaType, fileName), data: base64 },
-    });
-  }
-  // 그 외(불명확 content-type 포함)는 PDF 문서로 처리
-  return runExtraction({
-    type: "document",
-    source: { type: "base64", media_type: "application/pdf", data: base64 },
+  return runExtraction(toFileBlock(bytes, mediaType, fileName));
+}
+
+const CURRENCY_TOOL: Anthropic.Tool = {
+  name: "submit_currency",
+  description: "Submit the currency the statement is denominated in.",
+  input_schema: {
+    type: "object",
+    properties: {
+      currency: { type: "string" },
+      evidence: { type: "string" },
+    },
+    required: ["currency", "evidence"],
+  },
+};
+
+/** 통화만 판독 — 이미 적재된 행의 통화를 채우는 백필용(값 재추출 없이 저렴하게).
+ *  evidence 는 판별 근거 문구(사람이 표본 검수할 때 쓴다). */
+export async function detectCurrency(
+  bytes: Uint8Array,
+  mediaType: string,
+  fileName: string,
+): Promise<{ currency: string; evidence: string }> {
+  const client = new Anthropic();
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 256,
+    thinking: { type: "disabled" },
+    system: [
+      "You identify the currency of a financial statement. Do not extract any figures.",
+      "Read the unit note ('단위: 원', '단위: 천원', 'In thousands of USD', 'Amounts in NT$'), column headers, and currency symbols next to figures.",
+      "Mapping: 원/₩ → KRW. US$/USD/$ → USD. NT$/New Taiwan Dollar → TWD. S$ → SGD. ¥/円 → JPY. RMB/元 → CNY. € → EUR. £ → GBP. HK$ → HKD.",
+      "A Korean-language statement with no currency marking → KRW. If truly indeterminable → KRW.",
+      "Return the ISO 4217 code in `currency`, and in `evidence` quote the exact text or symbol you relied on (<=80 chars).",
+      "Submit via submit_currency tool.",
+    ].join("\n"),
+    tools: [CURRENCY_TOOL],
+    tool_choice: { type: "tool", name: "submit_currency" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          toFileBlock(bytes, mediaType, fileName),
+          { type: "text", text: "Which currency is this statement denominated in?" },
+        ],
+      },
+    ],
   });
+
+  for (const block of response.content) {
+    if (block.type === "tool_use" && block.name === "submit_currency") {
+      const d = block.input as Record<string, unknown>;
+      return {
+        currency: normCurrency(d.currency),
+        evidence: String(d.evidence ?? "").slice(0, 120),
+      };
+    }
+  }
+  throw new Error("통화 판독 결과 없음 (tool_use 블록 누락)");
 }

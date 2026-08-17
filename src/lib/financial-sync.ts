@@ -70,6 +70,9 @@ export function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials
     niLabel: list.map((d) => d.niLabel).find(Boolean) ?? "",
     oiLabel: list.map((d) => d.oiLabel).find(Boolean) ?? "",
     reLabel: list.map((d) => d.reLabel).find(Boolean) ?? "",
+    // KRW 는 판별 실패 시의 기본값이기도 하다 — 한 파일이라도 외화로 읽혔으면
+    // 그 통화를 택한다(같은 분기의 BS/IS 가 서로 다른 통화일 수는 없다).
+    currency: list.map((d) => d.currency).find((c) => c && c !== "KRW") ?? "KRW",
   };
 }
 
@@ -187,6 +190,7 @@ function toDbRow(d: ExtractedFinancials, rep: SlabFinancialReport) {
     total_assets: d.totalAssets,
     total_liabilities: d.totalLiabilities,
     retained_earnings: d.retainedEarnings,
+    currency: d.currency,
     source: "slab" as const,
     source_file: rep.fileName,
     source_file_url: rep.fileUrls.filter((u) => /^https?:/i.test(u)).join("\n"),

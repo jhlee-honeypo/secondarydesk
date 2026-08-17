@@ -416,6 +416,8 @@ export type FinancialStatement = {
   total_assets: number | null;
   total_liabilities: number | null;
   retained_earnings: number | null;
+  // 표기 통화(ISO 4217, 기본 KRW) — 값은 이 통화 그대로. 원화 환산이 아니다.
+  currency: string;
   source: "upload" | "slab";
   source_file: string | null;
   source_file_url: string | null;

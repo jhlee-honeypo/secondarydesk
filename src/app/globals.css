@@ -169,7 +169,10 @@
 [data-fin-view~="only-submitted"] tbody tr[data-sub="no"],
 [data-fin-view~="only-unsubmitted"] tbody tr[data-sub="yes"],
 [data-fin-view~="hide-exited"] tbody tr[data-exited="1"],
-[data-fin-view~="only-meeting"] tbody tr:not(:has([data-meeting="1"])) {
+[data-fin-view~="only-meeting"] tbody tr:not(:has([data-meeting="1"])),
+/* 확인 필요(review-flag.tsx) — 재무 데이터가 없는 행은 data-review 자체가 없어
+   같이 걸러진다(찍을 대상이 없는 행이라 의도된 동작). */
+[data-fin-view~="only-review"] tbody tr:not(:has([data-review="1"])) {
   display: none;
 }
 

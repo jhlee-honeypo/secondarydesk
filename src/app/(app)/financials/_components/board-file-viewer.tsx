@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatWon } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import {
   computeMetrics,
   gradeHealth,
@@ -294,7 +294,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
                             }
                           />
                         ) : (
-                          formatWon(values[f.key])
+                          formatMoney(values[f.key], fin.currency)
                         )}
                       </td>
                     </tr>
@@ -303,8 +303,8 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
               </table>
 
               <div className="space-y-0.5 rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                <div>보유현금 {formatWon(metrics.heldCash)}</div>
-                <div>월평균매출 {formatWon(metrics.monthlyRevenue)}</div>
+                <div>보유현금 {formatMoney(metrics.heldCash, fin.currency)}</div>
+                <div>월평균매출 {formatMoney(metrics.monthlyRevenue, fin.currency)}</div>
                 <div>
                   런웨이{" "}
                   {metrics.runwayMonths === null
@@ -326,7 +326,7 @@ export function BoardFileViewer({ fin }: { fin: FinancialStatement }) {
                         투자유치 <b>{fundingLabel(fin.funding_round)}</b>
                         {fin.funding_series ? ` · ${fin.funding_series}` : ""}
                         {fin.total_raised
-                          ? ` · 누적 ${formatWon(fin.total_raised)}`
+                          ? ` · 누적 ${formatMoney(fin.total_raised, fin.currency)}`
                           : ""}
                       </span>
                     )}

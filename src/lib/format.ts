@@ -38,6 +38,36 @@ export function formatWon(value: number | null | undefined): string {
   return Math.round(value).toLocaleString("ko-KR");
 }
 
+// 원화가 아닌 통화로 재무제표를 내는 기업들이 있다(달러·대만달러 등). 값은 문서에
+// 적힌 통화 그대로 저장하므로(환산 안 함), 화면에서는 기호를 붙여 단위를 밝힌다.
+// 없는 코드는 코드 그대로 앞에 붙인다(예: "VND 1,200").
+const CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  TWD: "NT$",
+  SGD: "S$",
+  HKD: "HK$",
+  JPY: "¥",
+  CNY: "¥",
+  EUR: "€",
+  GBP: "£",
+};
+
+/** 통화 접두 기호 — 원화(기본)는 빈 문자열(기존 표기 그대로). */
+export function currencyPrefix(currency: string | null | undefined): string {
+  const code = (currency ?? "KRW").toUpperCase();
+  if (!code || code === "KRW") return "";
+  return CURRENCY_SYMBOL[code] ?? `${code} `;
+}
+
+/** 금액 + 통화 기호(예: KRW 316,263,200 · USD $419,032). null/비유한 → "—". */
+export function formatMoney(
+  value: number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  const s = formatWon(value);
+  return s === "—" ? s : `${currencyPrefix(currency)}${s}`;
+}
+
 /** 천원(K) 단위 압축 표기 — EXIT 시나리오 카드/차트용(예: 299,994K). */
 export function formatThousandWon(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value))

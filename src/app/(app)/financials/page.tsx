@@ -16,7 +16,7 @@ import {
   type ListingStatus,
   type PositionStatus,
 } from "@/lib/types";
-import { fundLabel, formatWon, formatDate } from "@/lib/format";
+import { fundLabel, formatMoney, currencyPrefix, formatDate } from "@/lib/format";
 import { computeMetrics, gradeHealth } from "@/lib/financial-health";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
 } from "./_components/financials-view";
 import { HealthBadge } from "./_components/health-badge";
 import { MeetingPin } from "./_components/meeting-pin";
+import { ReviewFlag } from "./_components/review-flag";
 import { QuarterGroupSelect } from "./_components/quarter-group-select";
 import { FinancialHistory } from "./_components/financial-history";
 
@@ -54,11 +55,17 @@ function months(v: number | null): string {
 // 서로 어긋나는 게 정상이라 판정(gradeHealth)에는 쓰지 않고, 같은 칸 아래
 // 회색 보조 줄로만 보여준다.
 
-/** 추출값과 표기가 같으면 null — 같은 숫자를 두 번 쌓지 않는다. */
-function manualWon(manual: number | null, extracted: number | null): string | null {
+/** 추출값과 표기가 같으면 null — 같은 숫자를 두 번 쌓지 않는다.
+ *  통화는 그 행 재무제표의 통화를 따른다 — 달러로 재무제표를 내는 기업은 분기보고
+ *  기입값도 달러로 적는다(휴스페이스 2026Q2: 추출 419,032 vs 기입 390,000 — 실측). */
+function manualWon(
+  manual: number | null,
+  extracted: number | null,
+  currency: string,
+): string | null {
   if (manual === null) return null;
-  const s = formatWon(manual);
-  return extracted !== null && formatWon(extracted) === s ? null : s;
+  const s = formatMoney(manual, currency);
+  return extracted !== null && formatMoney(extracted, currency) === s ? null : s;
 }
 function manualMonths(manual: number | null, extracted: number | null): string | null {
   if (manual === null) return null;
@@ -289,6 +296,11 @@ export default async function FinancialsPage({
     position: PositionStatus | null;
     // 미팅 대상 핀(메모의 리마인드 기록과 별개인 on/off 상태)
     meeting: boolean;
+    // 추출값 확인 필요 표시 — 미팅 핀과 달리 이 회사가 아니라 아래 fin 행에 붙는다
+    review: { note: string | null } | null;
+    // 이 회사 재무제표의 표기 통화(ISO 4217). 선택 분기에 fin 이 없어도 다른 분기에서
+    // 알아낸 통화를 쓴다 — 수기값 표기 단위가 통화에 따라 달라지기 때문.
+    currency: string;
     // 회수 전략 그룹(수기) — 이 분기 기입값과 직전 분기 기입값
     group: ListingGroupCode | null;
     prevGroup: ListingGroupCode | null;
@@ -316,6 +328,7 @@ export default async function FinancialsPage({
         { data: finRows },
         { data: memoRows },
         { data: meetingRows },
+        { data: reviewRows },
         slabReports,
         slabContacts,
       ] = await Promise.all([
@@ -334,6 +347,9 @@ export default async function FinancialsPage({
           .from("listing_meeting_targets")
           .select("listing_id")
           .in("listing_id", listingIds),
+        // 확인 필요 표시는 재무 행 id 로 걸려 있어 매물로 좁힐 수 없다. 표시된 행만
+        // 담기는 작은 표라 전부 읽고, 아래에서 매칭된 fin 의 id 로만 꺼내 쓴다.
+        supabase.from("financial_review_flags").select("statement_id, note"),
         // slab 이 죽어도 재무 표는 떠야 하므로 실패 시 빈 배열(제출 현황만 전부 미제출로 표시)
         getSlabFinancialReports().catch(() => []),
         getSlabCompanyContacts().catch(() => []),
@@ -346,6 +362,12 @@ export default async function FinancialsPage({
       }
       const meetingListings = new Set(
         (meetingRows ?? []).map((r) => r.listing_id as string),
+      );
+      const reviewByStatement = new Map<string, { note: string | null }>(
+        (reviewRows ?? []).map((r) => [
+          r.statement_id as string,
+          { note: r.note as string | null },
+        ]),
       );
       const contactByBubble = new Map<string, CompanyContact>();
       const contactByName = new Map<string, CompanyContact>();
@@ -397,7 +419,18 @@ export default async function FinancialsPage({
 
       const byBubble = new Map<string, FinancialStatement>();
       const byName = new Map<string, FinancialStatement>();
+      // 통화는 분기 필터와 무관하게 회사 단위로 모은다(최신 분기 우선) — 선택 분기에
+      // 재무 행이 없는 회사도 수기값을 제 단위로 보여줘야 한다.
+      const curByBubble = new Map<string, string>();
+      const curByName = new Map<string, string>();
       for (const f of (finRows ?? []) as FinancialStatement[]) {
+        const cur = f.currency ?? "KRW";
+        if (cur !== "KRW") {
+          if (f.bubble_company_id && !curByBubble.has(f.bubble_company_id))
+            curByBubble.set(f.bubble_company_id, cur);
+          const cn = normName(f.company_name);
+          if (!curByName.has(cn)) curByName.set(cn, cur);
+        }
         // 분기 지정 시 그 분기만, 미지정 시 desc 정렬상 첫 건(=최신)
         if (period && (f.report_year !== selY || f.report_month !== selM)) continue;
         if (f.bubble_company_id && !byBubble.has(f.bubble_company_id))
@@ -412,12 +445,13 @@ export default async function FinancialsPage({
             (l.bubble_id ? repByBubble.get(l.bubble_id) : undefined) ??
             repByName.get(normName(l.company_name)) ??
             null;
+          const fin =
+            (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
+            byName.get(normName(l.company_name)) ??
+            null;
           return {
             listing: l,
-            fin:
-              (l.bubble_id ? byBubble.get(l.bubble_id) : undefined) ??
-              byName.get(normName(l.company_name)) ??
-              null,
+            fin,
             sub: rep
               ? {
                   reportMade: rep.reportMade,
@@ -434,6 +468,12 @@ export default async function FinancialsPage({
             memoCount: memoCountByListing.get(l.id) ?? 0,
             position: positionByListing.get(l.id) ?? null,
             meeting: meetingListings.has(l.id),
+            review: fin ? reviewByStatement.get(fin.id) ?? null : null,
+            currency:
+              fin?.currency ??
+              (l.bubble_id ? curByBubble.get(l.bubble_id) : undefined) ??
+              curByName.get(normName(l.company_name)) ??
+              "KRW",
             group: groupByListing.get(l.id) ?? null,
             prevGroup: prevGroupByListing.get(l.id) ?? null,
           };
@@ -593,6 +633,12 @@ export default async function FinancialsPage({
                   >
                     미팅
                   </th>
+                  <th
+                    className="px-2 py-2 text-center"
+                    title="재무제표가 잘못 올라와 추출값이 틀린 행에 표시 — 미팅 핀과 별개이며, 회사가 아니라 이 행의 분기 데이터에 붙습니다"
+                  >
+                    확인
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -606,6 +652,8 @@ export default async function FinancialsPage({
                     memoCount,
                     position,
                     meeting,
+                    review,
+                    currency,
                     group,
                     prevGroup,
                   }) => {
@@ -654,6 +702,24 @@ export default async function FinancialsPage({
                       />
                     </td>
                   );
+                  // 추출값 확인 필요 표시 — 표시할 대상이 이 행의 재무 데이터라,
+                  // 아직 추출된 게 없는 행(fin 없음)은 찍을 수 없다.
+                  const reviewCell = (
+                    <td className="px-2 py-2 text-center">
+                      {fin ? (
+                        <ReviewFlag
+                          statementId={fin.id}
+                          companyName={listing.company_name}
+                          quarterLabel={`${fin.report_year}년 ${fin.report_month / 3}분기`}
+                          initial={review}
+                        />
+                      ) : (
+                        <span title="추출된 재무 데이터가 없어 표시할 대상이 없습니다 (미수집 — 먼저 가져오기)">
+                          —
+                        </span>
+                      )}
+                    </td>
+                  );
                   const companyCell = (
                     <div className="flex items-start gap-1.5">
                       <div className="min-w-0">
@@ -687,6 +753,18 @@ export default async function FinancialsPage({
                         {LISTING_STATUS_LABEL[position ?? listing.status]}
                         {!position && "*"}
                       </Badge>
+                      {/* 외화로 재무제표를 내는 기업 — 표의 금액은 원화 환산이 아니라
+                          이 통화 그대로다. 기호($ 등)만으로는 어느 달러인지 헷갈려
+                          (USD vs 대만 TWD) 코드를 함께 밝힌다. */}
+                      {currency !== "KRW" && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 border-teal-600/40 text-[10px] text-teal-700 dark:text-teal-400"
+                          title={`재무제표를 ${currency} 로 제출하는 기업 — 이 행의 금액은 ${currency} 표기이며 원화로 환산하지 않았습니다`}
+                        >
+                          {currencyPrefix(currency).trim()} {currency}
+                        </Badge>
+                      )}
                     </div>
                   );
                   if (!fin) {
@@ -713,21 +791,21 @@ export default async function FinancialsPage({
                         {/* 재무제표가 없어도 기업이 기입한 수기값은 채운다 */}
                         <td className="px-3 py-2 text-right">
                           <Manual
-                            text={manualWon(slab?.currentCash ?? null, null)}
+                            text={manualWon(slab?.currentCash ?? null, null, currency)}
                             hint={manualHint}
                             primary
                           />
                         </td>
                         <td className="px-3 py-2 text-right">
                           <Manual
-                            text={manualWon(slab?.runRate ?? null, null)}
+                            text={manualWon(slab?.runRate ?? null, null, currency)}
                             hint={manualHint}
                             primary
                           />
                         </td>
                         <td className="px-3 py-2 text-right">
                           <Manual
-                            text={manualWon(slab?.burnRate ?? null, null)}
+                            text={manualWon(slab?.burnRate ?? null, null, currency)}
                             hint={manualHint}
                             primary
                           />
@@ -778,6 +856,7 @@ export default async function FinancialsPage({
                         </td>
                         {memoCell}
                         {meetingCell}
+                        {reviewCell}
                       </tr>
                     );
                   }
@@ -814,23 +893,35 @@ export default async function FinancialsPage({
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {formatWon(metrics.heldCash)}
+                        {formatMoney(metrics.heldCash, currency)}
                         <Manual
-                          text={manualWon(slab?.currentCash ?? null, metrics.heldCash)}
+                          text={manualWon(
+                            slab?.currentCash ?? null,
+                            metrics.heldCash,
+                            currency,
+                          )}
                           hint={manualHint}
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {formatWon(metrics.monthlyRevenue)}
+                        {formatMoney(metrics.monthlyRevenue, currency)}
                         <Manual
-                          text={manualWon(slab?.runRate ?? null, metrics.monthlyRevenue)}
+                          text={manualWon(
+                            slab?.runRate ?? null,
+                            metrics.monthlyRevenue,
+                            currency,
+                          )}
                           hint={manualHint}
                         />
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {formatWon(metrics.monthlySga)}
+                        {formatMoney(metrics.monthlySga, currency)}
                         <Manual
-                          text={manualWon(slab?.burnRate ?? null, metrics.monthlySga)}
+                          text={manualWon(
+                            slab?.burnRate ?? null,
+                            metrics.monthlySga,
+                            currency,
+                          )}
                           hint={manualHint}
                         />
                       </td>
@@ -840,7 +931,7 @@ export default async function FinancialsPage({
                           surplusClass(monthlySurplus),
                         )}
                       >
-                        {formatWon(monthlySurplus)}
+                        {formatMoney(monthlySurplus, currency)}
                       </td>
                       <td
                         className={cn(
@@ -871,7 +962,7 @@ export default async function FinancialsPage({
                           (fin.operating_income ?? 0) < 0 ? "text-rose-600" : "",
                         )}
                       >
-                        {formatWon(fin.operating_income)}
+                        {formatMoney(fin.operating_income, currency)}
                         {fin.operating_income !== null && (
                           <span className="block text-[10px] text-muted-foreground">
                             {pct(metrics.operatingMargin)}
@@ -916,6 +1007,7 @@ export default async function FinancialsPage({
                       </td>
                       {memoCell}
                       {meetingCell}
+                      {reviewCell}
                     </tr>
                   );
                   },

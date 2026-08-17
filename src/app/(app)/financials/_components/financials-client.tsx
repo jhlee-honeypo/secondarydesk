@@ -23,7 +23,7 @@ import {
   HEALTH_LABEL,
   type HealthLevel,
 } from "@/lib/financial-health";
-import { formatWon } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import {
   extractUploads,
   extractSlabBatch,
@@ -584,11 +584,11 @@ export function FinancialsClient() {
                     </div>
                     <div className="mt-2 text-[11px] text-muted-foreground">
                       런웨이 {metrics.runwayMonths === null ? "흑자/충분" : metrics.runwayMonths.toFixed(1) + "개월"} ·
-                      보유현금 {formatWon(metrics.heldCash)} ·
+                      보유현금 {formatMoney(metrics.heldCash, r.currency)} ·
                       {health.reasons.join(", ")}
                       {r.slab_cash !== null && (
                         <span className="ml-1">
-                          (slab 기입: 현금 {formatWon(r.slab_cash)}
+                          (slab 기입: 현금 {formatMoney(r.slab_cash, r.currency)}
                           {r.slab_runway !== null ? ` · 런웨이 ${r.slab_runway}개월` : ""})
                         </span>
                       )}
@@ -609,7 +609,7 @@ export function FinancialsClient() {
                                   ? ` · ${r.slab_funding_series}`
                                   : ""}
                                 {r.slab_total_raised
-                                  ? ` · 누적 ${formatWon(r.slab_total_raised)}`
+                                  ? ` · 누적 ${formatMoney(r.slab_total_raised, r.currency)}`
                                   : ""}
                               </span>
                             )}

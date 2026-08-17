@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatDate, formatWon } from "@/lib/format";
+import { currencyPrefix, formatDate, formatWon } from "@/lib/format";
 import {
   computeMetrics,
   gradeHealth,
@@ -43,17 +43,32 @@ type NumCol = {
   nullLabel?: string;
   /** 증감을 %p 로 표기(비율 지표) */
   point?: boolean;
+  /** 금액 열 — 원화가 아닌 통화면 앞에 기호를 붙인다(증감 줄은 붙이지 않는다) */
+  money?: boolean;
 };
 
 const NUM_COLS: NumCol[] = [
-  { label: "보유현금", get: (_f, m) => m.heldCash, fmt: won, better: "up" },
-  { label: "월평균매출", get: (_f, m) => m.monthlyRevenue, fmt: won, better: "up" },
-  { label: "월평균지출", get: (_f, m) => m.monthlySga, fmt: won, better: "down" },
+  { label: "보유현금", get: (_f, m) => m.heldCash, fmt: won, better: "up", money: true },
+  {
+    label: "월평균매출",
+    get: (_f, m) => m.monthlyRevenue,
+    fmt: won,
+    better: "up",
+    money: true,
+  },
+  {
+    label: "월평균지출",
+    get: (_f, m) => m.monthlySga,
+    fmt: won,
+    better: "down",
+    money: true,
+  },
   {
     label: "월평균차액",
     get: (_f, m) => (m.monthlyBurn === null ? null : -m.monthlyBurn),
     fmt: won,
     better: "up",
+    money: true,
   },
   {
     label: "런웨이",
@@ -77,7 +92,13 @@ const NUM_COLS: NumCol[] = [
     point: true,
   },
   // 영업이익(영업손실은 음수) — 추출 확장 이전 분기는 null 이라 '—' 로 남는다.
-  { label: "영업이익", get: (f) => f.operating_income, fmt: won, better: "up" },
+  {
+    label: "영업이익",
+    get: (f) => f.operating_income,
+    fmt: won,
+    better: "up",
+    money: true,
+  },
 ];
 
 /** 이전(더 오래된) 분기 대비 증감 한 줄. 비교 대상이 없으면 그리지 않는다. */
@@ -243,7 +264,9 @@ export function FinancialHistory({
                               key={c.label}
                               className="px-3 py-2 text-right whitespace-nowrap"
                             >
-                              {cur === null ? (c.nullLabel ?? "—") : c.fmt(cur)}
+                              {cur === null
+                                ? (c.nullLabel ?? "—")
+                                : `${c.money ? currencyPrefix(f.currency) : ""}${c.fmt(cur)}`}
                               <Delta col={c} cur={cur} prev={prev} />
                             </td>
                           );

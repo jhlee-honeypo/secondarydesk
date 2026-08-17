@@ -10,7 +10,7 @@ import {
   SearchableSelect,
   type ComboOption,
 } from "@/components/app/searchable-select";
-import { formatWon } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import {
   computeMetrics,
   gradeHealth,
@@ -252,16 +252,16 @@ export function FinancialStatusTable({
                     )}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                    {formatWon(fin.rev_curr)}
+                    {formatMoney(fin.rev_curr, fin.currency)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                    {formatWon(fin.operating_income)}
+                    {formatMoney(fin.operating_income, fin.currency)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                    {formatWon(fin.ni_curr)}
+                    {formatMoney(fin.ni_curr, fin.currency)}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
-                    {formatWon(fin.total_equity)}
+                    {formatMoney(fin.total_equity, fin.currency)}
                     {metrics.capitalErosion !== null && metrics.capitalErosion > 0 && (
                       <span className="block text-[10px] text-amber-600 dark:text-amber-400">
                         잠식 {pctOrDash(metrics.capitalErosion)}
