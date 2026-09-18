@@ -172,6 +172,31 @@ function signByLabel(value: number, label: unknown, lossWord: "손실" | "결손
   return decisive && value > 0 ? -value : value;
 }
 
+// 영업이익 부호 교차검증. 라벨이 겸용 표제(영업손익·영업이익(손실))면 signByLabel 이
+// 손댈 수 없는데, 그때 모델이 손실을 양수로 내면 적자가 흑자로 저장된다
+// (적재분 실측: 252행 중 4행에서 부호 뒤집힘 — 3건이 적자→흑자 방향).
+//
+// 손익계산서 항등식 '영업이익 = 매출 − 매출원가 − 판관비' 로 역산해 대조한다.
+// 판관비 집계 범위가 서류마다 조금씩 달라 값 자체는 어긋날 수 있으므로,
+// **크기는 거의 같은데 부호만 반대인 경우에만** 뒤집는다 — 그 외에는 건드리지 않는다.
+const OI_MAGNITUDE_TOLERANCE = 0.02; // 크기 일치로 볼 상대오차
+const OI_MIN_SIGNIFICANCE = 0.1; // 0 근처 잡음에서 부호를 논하지 않기 위한 하한
+
+function reconcileOperatingIncome(
+  operatingIncome: number,
+  revenue: number,
+  cogs: number,
+  sga: number,
+): number {
+  const expected = revenue - cogs - sga;
+  const scale = Math.max(Math.abs(expected), Math.abs(operatingIncome), 1);
+  if (Math.abs(expected) / scale < OI_MIN_SIGNIFICANCE) return operatingIncome;
+  const matchesFlipped =
+    Math.abs(operatingIncome + expected) / scale < OI_MAGNITUDE_TOLERANCE;
+  const matchesAsIs = Math.abs(operatingIncome - expected) / scale < OI_MAGNITUDE_TOLERANCE;
+  return matchesFlipped && !matchesAsIs ? -operatingIncome : operatingIncome;
+}
+
 // 통화 기호·표기를 ISO 4217 3자리로. 모델이 코드 대신 기호를 낼 수 있고, DB 는
 // ^[A-Z]{3}$ 만 받으므로 여기서 정규화한다. 판별 불가·미표기는 원화(기존 동작).
 const CURRENCY_ALIAS: Record<string, string> = {
@@ -274,9 +299,12 @@ async function runExtraction(
   for (const block of response.content) {
     if (block.type === "tool_use" && block.name === "submit_financial_data") {
       const d = block.input as Record<string, unknown>;
+      const revCurr = num(d.revCurr);
+      const cogs = num(d.cogs);
+      const sga = num(d.sga);
       return {
         companyName: String(d.companyName ?? "").trim() || "unknown",
-        revCurr: num(d.revCurr),
+        revCurr,
         niCurr: signByLabel(num(d.niCurr), d.niLabel, "손실"),
         revPrev: num(d.revPrev),
         niPrev: num(d.niPrev),
@@ -285,9 +313,15 @@ async function runExtraction(
         totalEquity: num(d.totalEquity),
         capital: num(d.capital),
         month: num(d.month),
-        sga: num(d.sga),
-        cogs: num(d.cogs),
-        operatingIncome: signByLabel(num(d.operatingIncome), d.oiLabel, "손실"),
+        sga,
+        cogs,
+        // 라벨 규칙 → 손익계산서 항등식 교차검증 순으로 부호를 확정한다.
+        operatingIncome: reconcileOperatingIncome(
+          signByLabel(num(d.operatingIncome), d.oiLabel, "손실"),
+          revCurr,
+          cogs,
+          sga,
+        ),
         currentAssets: num(d.currentAssets),
         currentLiabilities: num(d.currentLiabilities),
         totalAssets: num(d.totalAssets),

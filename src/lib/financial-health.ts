@@ -7,7 +7,8 @@
 //   월순소모   = 월평균판관비 − 월평균매출   (양수면 매달 현금 소모)
 //   런웨이     = 보유현금 / 월순소모          (소모 중일 때만, 개월)
 //   자본잠식률 = (자본금 − 자본총계) / 자본금
-//   매출성장률 = (매출당기 − 매출전기) / |매출전기|
+//   매출성장률 = (매출당기 − 매출전기) / |매출전기|   ※ 연간(보고월 12)에서만 — 전기는
+//                전년 '연간' 값이라 반기·분기 누적과는 구간 길이가 달라 비교가 성립하지 않는다
 //   매출총이익률 = (매출 − 매출원가) / 매출
 //   영업이익률 = 영업이익 / 매출
 //   부채비율   = 부채총계 / 자본총계   (자본총계 > 0 일 때만)
@@ -41,7 +42,7 @@ export type FinancialMetrics = {
   runwayMonths: number | null; // 런웨이 (소모 중일 때만, 그 외 null)
   capitalErosion: number | null; // 자본잠식률 (자본금 0이면 null)
   isProfit: boolean; // 당기 흑자 여부
-  revenueGrowth: number | null; // 매출성장률 (전기 0이면 null)
+  revenueGrowth: number | null; // 매출성장률 (연간 보고에서만 계산 — 아래 주석 참고. 전기 0이면 null)
   grossMargin: number | null; // 매출총이익률 (매출 0이면 null)
   operatingMargin: number | null; // 영업이익률 (매출 0이면 null)
   debtRatio: number | null; // 부채비율 (자본총계 ≤ 0이면 null)
@@ -76,8 +77,15 @@ export function computeMetrics(i: FinancialInput): FinancialMetrics {
   const capitalErosion =
     i.capital !== 0 ? (i.capital - i.total_equity) / i.capital : null;
 
+  // 전기(rev_prev)는 '전년 *연간*' 매출이다 — 실측 확인: 2026-06 행의 rev_prev 가 같은
+  // 회사 2025-12 행의 rev_curr 과 일치했다(비교 가능한 27곳 중 19곳, '전년 동기' 가설은 0곳).
+  // 당기가 누적 6개월인데 전기가 12개월이면 사업이 그대로여도 -50% 가 찍히고, 그 값이
+  // 아래 gradeHealth 의 '매출 역성장 → 주의' 판정까지 밀어 올린다(연간 외 234행 중 153행).
+  // 그래서 구간 길이가 같은 연간(12월 누적)에서만 성장률을 낸다.
   const revenueGrowth =
-    i.rev_prev !== 0 ? (i.rev_curr - i.rev_prev) / Math.abs(i.rev_prev) : null;
+    i.report_month === 12 && i.rev_prev !== 0
+      ? (i.rev_curr - i.rev_prev) / Math.abs(i.rev_prev)
+      : null;
 
   const grossMargin =
     i.rev_curr !== 0 ? (i.rev_curr - (i.cogs ?? 0)) / i.rev_curr : null;
