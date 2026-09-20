@@ -15,7 +15,11 @@ import {
   getSlabFinancialReports,
   type SlabFinancialReport,
 } from "@/lib/bubble";
-import { extractFromFile, type ExtractedFinancials } from "@/lib/claude-extract";
+import {
+  extractFromFile,
+  pickCurrencyGroup,
+  type ExtractedFinancials,
+} from "@/lib/claude-extract";
 
 /** 한 번의 실행에서 새 추출을 시작하지 않는 시각(ms). 라우트 maxDuration 300s 안에서
  *  이미 진행 중인 건이 끝날 여유를 남긴다. */
@@ -70,9 +74,9 @@ export function mergeExtracted(list: ExtractedFinancials[]): ExtractedFinancials
     niLabel: list.map((d) => d.niLabel).find(Boolean) ?? "",
     oiLabel: list.map((d) => d.oiLabel).find(Boolean) ?? "",
     reLabel: list.map((d) => d.reLabel).find(Boolean) ?? "",
-    // KRW 는 판별 실패 시의 기본값이기도 하다 — 한 파일이라도 외화로 읽혔으면
-    // 그 통화를 택한다(같은 분기의 BS/IS 가 서로 다른 통화일 수는 없다).
-    currency: list.map((d) => d.currency).find((c) => c && c !== "KRW") ?? "KRW",
+    // pickCurrencyGroup 을 먼저 통과했으므로 list 는 단일 통화다. 값과 통화가
+    // 다른 파일에서 나오지 않도록, 값을 가져온 그룹의 통화를 그대로 쓴다.
+    currency: list[0].currency,
   };
 }
 
@@ -141,9 +145,38 @@ export async function findPendingReports(
   return pending.sort((a, b) => ord(b.year, b.month) - ord(a.year, a.month));
 }
 
-/** 보고 1건 추출. 파일이 여러 개면 '연결' 파일 우선, 없으면 전부 추출 후 병합. */
+/**
+ * 회사별로 이미 쓰고 있는 통화 = '가장 최근 분기'의 통화. 본사·해외 자회사 서류가 같이
+ * 첨부된 분기에서 어느 쪽을 값으로 채택할지 가르는 기준이다(pickCurrencyGroup).
+ * 최빈이 아니라 최신인 이유: ①법인 이전·보고 주체 변경은 최근 보고가 현재 실체다
+ * ②과거에 잘못 저장된 행이 다수라도 기준을 오염시키지 않는다(나인라이브스는 잘못 저장된
+ * 2025 IDR 4행 vs 정상 2026 KRW 2행이라 최빈으로는 IDR 이 이겼다).
+ */
+export async function latestCurrencyByCompany(
+  supabase: SupabaseClient,
+): Promise<Map<string, string>> {
+  const { data } = await supabase
+    .from("financial_statements")
+    .select("bubble_company_id, currency, report_year, report_month");
+  const latestOrd = new Map<string, number>();
+  const currency = new Map<string, string>();
+  for (const r of data ?? []) {
+    const cid = r.bubble_company_id as string | null;
+    if (!cid || !r.currency) continue;
+    const ord = ((r.report_year as number) ?? 0) * 100 + ((r.report_month as number) ?? 0);
+    if ((latestOrd.get(cid) ?? -1) >= ord) continue;
+    latestOrd.set(cid, ord);
+    currency.set(cid, r.currency as string);
+  }
+  return currency;
+}
+
+/** 보고 1건 추출. 파일이 여러 개면 '연결' 파일 우선, 없으면 전부 추출 후 병합.
+ *  단 통화가 다른 파일(해외 자회사 서류 등)은 병합하지 않는다 — pickCurrencyGroup.
+ *  preferredCurrency = 그 회사가 이미 쓰고 있는 통화(그룹 선택 기준). */
 async function extractReport(
   rep: SlabFinancialReport,
+  preferredCurrency?: string,
 ): Promise<{ data: ExtractedFinancials; urls: string[] } | { error: string }> {
   const consolidated = rep.fileUrls.filter((u) => /연결|consolidat/i.test(safeDecode(u)));
   const orderedUrls = consolidated.length
@@ -164,7 +197,15 @@ async function extractReport(
   if (extracted.length === 0) {
     return { error: `${rep.nameKr} ${rep.year}-${rep.month}: ${failures.join(" / ") || "추출 실패"}` };
   }
-  return { data: mergeExtracted(extracted), urls: orderedUrls };
+
+  const { group, dropped } = pickCurrencyGroup(extracted, preferredCurrency);
+  if (dropped.length > 0) {
+    // 버린 서류가 실은 본사 것일 수도 있으니(통화 오판독) 흔적을 남긴다.
+    console.warn(
+      `[financial-sync] ${rep.nameKr} ${rep.year}-${rep.month}: 통화가 다른 첨부 ${dropped.join("/")} 를 병합에서 제외(채택 ${group[0].currency})`,
+    );
+  }
+  return { data: mergeExtracted(group), urls: orderedUrls };
 }
 
 function toDbRow(d: ExtractedFinancials, rep: SlabFinancialReport) {
@@ -245,6 +286,8 @@ export async function runFinancialSync(
     };
   }
 
+  const preferredCurrency = await latestCurrencyByCompany(supabase);
+
   const cap = Math.max(1, Math.min(limit ?? MAX_PER_RUN, MAX_PER_RUN));
   const queue = pendingAll.slice(0, cap);
   let cursor = 0;
@@ -261,7 +304,7 @@ export async function runFinancialSync(
       const rep = queue[i];
       attempted++;
 
-      const res = await extractReport(rep);
+      const res = await extractReport(rep, preferredCurrency.get(rep.companyId));
       if ("error" in res) {
         failed++;
         errors.push(res.error);

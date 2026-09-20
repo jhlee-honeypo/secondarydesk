@@ -30,6 +30,8 @@ const SYSTEM_PROMPT = [
   "   - Re-check: cash + savings must equal total 현금및현금성자산, with no amount counted in both.",
   "   - Common labels: 보통예금, 예금, 정기예금.",
   "8. totalEquity (number): 자본총계 from 재무상태표 자본 section.",
+  "   - NEVER take the last line '부채와자본총계' (or 부채및자본총계/자본과부채총계) — that equals 자산총계, not 자본총계.",
+  "   - 자본총계 is negative when 결손금 exceeds paid-in capital (자본잠식). Report it as a negative number; do not substitute a positive figure from another line.",
   "9. capital (number): 자본금 from 재무상태표 자본 section first line.",
   "10. month (number): report month - 3, 6, 9, or 12.",
   "11. sga (number): 판매비와관리비 from 손익계산서.",
@@ -197,6 +199,32 @@ function reconcileOperatingIncome(
   return matchesFlipped && !matchesAsIs ? -operatingIncome : operatingIncome;
 }
 
+// 자본총계 교차검증. 한국 재무상태표의 맨 아랫줄은 '부채와자본총계'(= 자산총계)라서,
+// **자본이 음수인 회사(자본잠식)** 에서 모델이 그 줄을 자본총계로 집는 일이 있다. 그러면
+// 자본잠식 기업이 자본 충실한 기업으로 저장돼 건전성 판정이 정반대가 된다
+// (적재분 실측 593행 중 3행: 로랩스 2026-03, 틴고랜드 2025-12·2026-03 — 전부 부채>자산).
+//
+// 재무상태표 항등식 '자본총계 = 자산총계 − 부채총계' 로 역산하되, **자본총계가 자산총계와
+// 같은(= 아랫줄을 집은) 경우에만** 교정한다. 그 밖의 불일치는 자산·부채·자본 중 무엇이
+// 틀렸는지 알 수 없으므로 손대지 않고 감사(tmp/backfill-audit.mjs)에 남긴다.
+const EQ_TOLERANCE = 0.02;
+
+export function reconcileTotalEquity(
+  totalEquity: number,
+  totalAssets: number,
+  totalLiabilities: number,
+): number {
+  if (!totalAssets || !totalLiabilities) return totalEquity;
+  const rel = (a: number, b: number) => {
+    const m = Math.max(Math.abs(a), Math.abs(b));
+    return m === 0 ? 0 : Math.abs(a - b) / m;
+  };
+  // 이미 항등식이 맞으면 건드릴 이유가 없다.
+  if (rel(totalAssets, totalLiabilities + totalEquity) <= EQ_TOLERANCE) return totalEquity;
+  if (rel(totalEquity, totalAssets) > EQ_TOLERANCE) return totalEquity; // 아랫줄 오집기 아님
+  return totalAssets - totalLiabilities;
+}
+
 // 통화 기호·표기를 ISO 4217 3자리로. 모델이 코드 대신 기호를 낼 수 있고, DB 는
 // ^[A-Z]{3}$ 만 받으므로 여기서 정규화한다. 판별 불가·미표기는 원화(기존 동작).
 const CURRENCY_ALIAS: Record<string, string> = {
@@ -227,6 +255,50 @@ export function normCurrency(v: unknown): string {
   // 'USD (in thousands)' 같은 서술형에서 코드만 건져낸다.
   const m = /\b(KRW|USD|TWD|SGD|JPY|CNY|EUR|GBP|HKD|VND|INR|AUD|CAD|CHF)\b/.exec(upper);
   return m ? m[1] : "KRW";
+}
+
+/**
+ * 한 분기에 첨부된 여러 파일의 추출 결과 중 '한 행으로 병합해도 되는 것'만 고른다.
+ *
+ * 왜 필요한가: 기업이 분기보고에 본사 서류와 해외 자회사 서류를 같이 올리는 일이
+ * 흔하다(케이존=한국 본사+미국+중국, 나인라이브스=국내+인도네시아). 이걸 그대로
+ * 병합하면 값과 통화가 서로 다른 법인에서 나온다 — 실제로 케이존 2025-06 은 값은
+ * 한국 본사인데 통화만 USD 로 저장됐고, 유유유유유 2025-06 은 자산(USD)과
+ * 부채(KRW)가 한 행에 섞였다. 재무상태표·손익계산서 분리 제출(같은 법인·같은 통화)
+ * 은 병합이 맞으므로, 가르는 기준은 '통화가 같은가'로 잡는다.
+ *
+ * 그룹 선택 우선순위:
+ *   1) preferred — 그 회사가 이미 쓰고 있는 통화(DB 에 저장된 최빈 통화). 국내
+ *      법인이면 KRW, 해외 법인(휴스페이스·큐레이터 등)이면 USD 가 잡힌다.
+ *   2) KRW — 이력이 없으면 국내 법인으로 본다(포트폴리오 대부분이 국내 법인).
+ *   3) 첫 파일의 통화 — 전부 외화인 신규 회사.
+ *
+ * ⚠️ 절충: 통화 표기가 없는 서류는 추출 단계에서 KRW 로 기본값 처리되므로(normCurrency),
+ * 외화 회사의 BS/IS 중 한쪽만 표기가 있으면 표기 없는 쪽이 버려져 그 파일의 값이 0 으로
+ * 남는다. 그래도 섞는 것보다 낫다 — 버리면 값이 비어 눈에 띄고 감사(항등식·빈 행)가
+ * 잡지만, 섞으면 틀린 통화의 숫자가 조용히 저장된다. 버린 통화는 호출부가 로그로 남긴다.
+ */
+export function pickCurrencyGroup(
+  list: ExtractedFinancials[],
+  preferred?: string,
+): { group: ExtractedFinancials[]; dropped: string[] } {
+  const groups = new Map<string, ExtractedFinancials[]>();
+  for (const d of list) {
+    const c = normCurrency(d.currency);
+    groups.set(c, [...(groups.get(c) ?? []), d]);
+  }
+  if (groups.size <= 1) return { group: list, dropped: [] };
+
+  const pref = preferred ? normCurrency(preferred) : undefined;
+  const chosen =
+    (pref && groups.has(pref) && pref) ||
+    (groups.has("KRW") && "KRW") ||
+    normCurrency(list[0].currency);
+
+  return {
+    group: groups.get(chosen) as ExtractedFinancials[],
+    dropped: [...groups.keys()].filter((c) => c !== chosen),
+  };
 }
 
 function ext(fileName: string): string {
@@ -310,7 +382,12 @@ async function runExtraction(
         niPrev: num(d.niPrev),
         cash: num(d.cash),
         savings: num(d.savings),
-        totalEquity: num(d.totalEquity),
+        // 자본총계는 재무상태표 항등식으로 교차검증한다(자본잠식 행의 '부채와자본총계' 오집기).
+        totalEquity: reconcileTotalEquity(
+          num(d.totalEquity),
+          num(d.totalAssets),
+          num(d.totalLiabilities),
+        ),
         capital: num(d.capital),
         month: num(d.month),
         sga,

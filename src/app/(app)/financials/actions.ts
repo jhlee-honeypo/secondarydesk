@@ -7,12 +7,18 @@ import { getCurrentUser } from "@/lib/supabase/auth";
 import {
   extractFromFile,
   isSupportedFile,
+  pickCurrencyGroup,
   type ExtractedFinancials,
 } from "@/lib/claude-extract";
 import { getSlabFinancialReports, fetchSlabFile } from "@/lib/bubble";
 // 병합·정규화 규칙은 크론 자동 적재(financial-sync)와 반드시 같아야 한다.
 // 두 경로가 갈리면 같은 PDF 가 화면과 크론에서 다른 값으로 저장된다.
-import { mergeExtracted, pickNonZero, safeDecode } from "@/lib/financial-sync";
+import {
+  latestCurrencyByCompany,
+  mergeExtracted,
+  pickNonZero,
+  safeDecode,
+} from "@/lib/financial-sync";
 
 // 검토 표에 띄우는 추출 행(저장 전). 사용자가 수정 후 saveFinancials 로 확정.
 export type ReviewRow = {
@@ -199,6 +205,8 @@ export async function listSlabReports(): Promise<SlabReportItem[]> {
 export async function extractSlabBatch(keys: string[]): Promise<ExtractResult> {
   const reports = await getSlabFinancialReports();
   const byKey = new Map(reports.map((r) => [r.key, r]));
+  // 통화가 다른 첨부(해외 자회사 서류 등)를 병합에서 제외할 때의 기준 통화.
+  const preferredCurrency = await latestCurrencyByCompany(await createClient());
   const rows: ReviewRow[] = [];
   const errors: string[] = [];
 
@@ -235,7 +243,17 @@ export async function extractSlabBatch(keys: string[]): Promise<ExtractResult> {
     }
     if (extracted.length === 0) continue; // 모든 파일 실패 → 위 오류만 남김
 
-    const d = mergeExtracted(extracted);
+    // 크론과 같은 규칙: 통화가 다른 파일은 한 행으로 병합하지 않는다.
+    const { group, dropped } = pickCurrencyGroup(
+      extracted,
+      preferredCurrency.get(rep.companyId),
+    );
+    if (dropped.length > 0) {
+      errors.push(
+        `${rep.nameKr}: 통화가 다른 첨부 ${dropped.join("/")} 를 병합에서 제외(채택 ${group[0].currency})`,
+      );
+    }
+    const d = mergeExtracted(group);
     rows.push(
       toRow(d, {
         key: `slab-${rep.key}`,
