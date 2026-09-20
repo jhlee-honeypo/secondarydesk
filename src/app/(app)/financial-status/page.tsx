@@ -99,14 +99,16 @@ export default async function FinancialStatusPage() {
   const withFin = rows.filter((r) => r.latest).length;
 
   return (
-    <div className="space-y-6">
+    // 표가 화면 밖으로 넘치는 대신 카드 안에서 가로·세로로 스크롤되도록 페이지
+    // 높이를 뷰포트에 맞춰 고정한다(뷰포트 − 상단바 3.5rem − main 상하 padding 3rem).
+    // 재무 점검 탭과 같은 방식 — 그래야 가로 스크롤바가 늘 화면 하단에 보인다.
+    <div className="flex h-[calc(100svh-6.5rem)] flex-col gap-3">
       <div>
-        <h1 className="text-xl font-semibold">재무 추출 현황</h1>
-        <p className="text-sm text-muted-foreground">
-          slab 전체 기업 기준 재무제표 추출 현황입니다. 분기보고에 첨부된 재무제표가
-          추출된 기업은 최신 분기 지표(매출·영업이익·자본총계·건전성)와 재무상태표
-          정합 여부를, 없으면 “정보 없음”으로 표시합니다. 전체 {rows.length}곳 중 재무{" "}
-          {withFin}곳.
+        <h1 className="text-lg font-semibold">재무 추출 현황</h1>
+        <p className="text-xs text-muted-foreground">
+          slab 전체 기업 기준, 재무제표에서 추출해 저장한 값 전체(raw)입니다. 한 줄 =
+          한 회사의 최신 분기이며, 회사명을 누르면 과거 분기가 펼쳐집니다. 전체{" "}
+          {rows.length}곳 중 재무 {withFin}곳.
         </p>
       </div>
 
