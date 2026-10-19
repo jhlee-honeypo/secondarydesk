@@ -12,6 +12,16 @@ import type { Verdict } from "./dd-screen";
 export type DocStatus =
   /** 제출됐고 유효 */
   | "ok"
+  /**
+   * 파일 대신 '해당 없음' 사유로 응답한 항목. 응답으로는 충족이지만 **서류로
+   * 검증된 것은 아니다** — 2단계 리스크 판정은 이 진술을 자기확약으로 취급한다.
+   */
+  | "declared"
+  /**
+   * 법인 설립 후에야 발급되는 서류(등기부·정관·자본금). 지금은 존재할 수 없으니
+   * 누락으로 세지 않고 **필수 분모에서 뺀다**.
+   */
+  | "deferred"
   /** 필수인데 해당 파일 없음 */
   | "missing"
   /** 파일은 있으나 AI 가 읽지 못하는 형식(xlsx·hwp 등) */
@@ -39,13 +49,23 @@ export type CompletenessResult = {
   verdict: Verdict;
   summary: string;
   items: CompletenessItem[];
-  /** 필수 항목 충족 수 / 전체 필수 수 */
+  /**
+   * 필수 항목 충족 수 / 전체 필수 수. 분모에서 deferred(설립 후 제출 예정)는
+   * 빠진다 — 제출 포털도 그렇게 센다(치즈랩 10/10, 프리프 2/11).
+   */
   requiredMet: number;
   requiredTotal: number;
   /** 어느 체크리스트에도 안 붙은 파일 id — 화면에서 사람이 지정하게 띄운다. */
   unmatchedFileIds: string[];
   /** 문서상 회사명이 대상 기업과 다른 파일. 엉뚱한 회사 서류가 섞인 신호. */
   companyMismatches: { fileId: string; docCompany: string }[];
+};
+
+/** 파일 없이 응답한 항목(dd_declarations). */
+export type DdDeclarationForJudging = {
+  criterionCode: string;
+  kind: "none_applicable" | "deferred";
+  reason: string;
 };
 
 export type DdFileForJudging = {
@@ -84,9 +104,14 @@ export function judgeCompleteness(args: {
   companyName: string;
   criteria: DocCriterionSeed[];
   files: DdFileForJudging[];
+  /** 파일 대신 사유로 응답한 항목. 없으면 빈 배열과 같다. */
+  declarations?: DdDeclarationForJudging[];
   referenceDate?: Date;
 }): CompletenessResult {
   const now = args.referenceDate ?? new Date();
+  const declByCode = new Map(
+    (args.declarations ?? []).map((d) => [d.criterionCode, d]),
+  );
   const byCode = new Map<string, DdFileForJudging[]>();
   const unmatchedFileIds: string[] = [];
 
@@ -111,7 +136,24 @@ export function judgeCompleteness(args: {
     const matched = byCode.get(c.code) ?? [];
     const fileIds = matched.map((f) => f.id);
 
+    // 파일이 없으면 진술을 본다. 파일과 진술이 함께 있으면 파일이 이긴다 —
+    // "해당 없음"이라 해 놓고 서류가 올라온 경우, 실물이 판단 근거다.
     if (matched.length === 0) {
+      const decl = declByCode.get(c.code);
+      if (decl) {
+        return {
+          code: c.code,
+          label: c.label,
+          required: c.required,
+          status: decl.kind === "deferred" ? "deferred" : "declared",
+          fileIds,
+          reason:
+            decl.reason ||
+            (decl.kind === "deferred"
+              ? "법인 설립 후 제출 예정"
+              : "해당 없음으로 응답(사유 미기재)"),
+        };
+      }
       return {
         code: c.code,
         label: c.label,
@@ -198,9 +240,15 @@ export function judgeCompleteness(args: {
     })
     .map((f) => ({ fileId: f.id, docCompany: f.docCompany.trim() }));
 
-  const required = items.filter((i) => i.required);
+  // deferred 는 분모에서 뺀다 — 법인 설립 전이라 발급 자체가 불가능한 서류를
+  // 요구하면 설립 준비 중인 기업이 항상 탈락한다.
+  const deferred = items.filter((i) => i.required && i.status === "deferred");
+  const required = items.filter((i) => i.required && i.status !== "deferred");
   const requiredTotal = required.length;
-  const requiredMet = required.filter((i) => i.status === "ok").length;
+  const declared = required.filter((i) => i.status === "declared");
+  const requiredMet = required.filter(
+    (i) => i.status === "ok" || i.status === "declared",
+  ).length;
 
   const blocking = required.filter(
     (i) => i.status === "missing" || i.status === "unreadable",
@@ -218,12 +266,25 @@ export function judgeCompleteness(args: {
       .join(", ")}. 보완 전에는 리스크 판정을 돌리지 않습니다.`;
   } else if (soft.length > 0) {
     verdict = "hold";
-    summary = `필수 서류는 모두 제출됐으나 ${soft.length}종에 확인이 필요합니다 — ${soft
+    summary = `필수 항목 ${requiredTotal}종에 모두 응답했으나 ${soft.length}종에 확인이 필요합니다 — ${soft
       .map((i) => `${i.label}(${i.reason})`)
       .join(" / ")}`;
   } else {
     verdict = "pass";
-    summary = `필수 서류 ${requiredTotal}종이 모두 제출·유효합니다.`;
+    summary = `필수 항목 ${requiredTotal}종에 모두 응답·유효합니다.`;
+  }
+
+  // 진술은 '응답'이지 '검증'이 아니다. 몇 종이 서류 없이 통과했는지 요약에
+  // 드러내지 않으면, 투심에서 '필수 전부 제출'로 읽힌다.
+  if (declared.length > 0) {
+    summary += ` 이 중 ${declared.length}종은 서류가 아니라 회사의 '해당 없음' 진술로 응답한 항목입니다(${declared
+      .map((i) => i.label)
+      .join(", ")}) — 리스크 판정에서 자기확약으로 다룹니다.`;
+  }
+  if (deferred.length > 0) {
+    summary += ` 법인 설립 후 제출 예정인 ${deferred.length}종(${deferred
+      .map((i) => i.label)
+      .join(", ")})은 필수 집계에서 제외했습니다.`;
   }
 
   if (companyMismatches.length > 0) {

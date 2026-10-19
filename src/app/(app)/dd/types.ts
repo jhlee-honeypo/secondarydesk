@@ -46,6 +46,14 @@ export type DdFile = {
   uploadedAt: string;
 };
 
+/** 파일 없이 사유로 응답한 항목. 제출 포털의 '해당 없음 진술'·'설립 후 제출 예정'. */
+export type DdDeclaration = {
+  criterionCode: string;
+  kind: "none_applicable" | "deferred";
+  reason: string;
+  updatedAt: string;
+};
+
 export type CompletenessDetails = {
   items: CompletenessItem[];
   requiredMet: number;
@@ -81,6 +89,7 @@ export type DdCompany = {
   name: string;
   note: string;
   files: DdFile[];
+  declarations: DdDeclaration[];
   completeness: (DdAssessment & { details: CompletenessDetails }) | null;
   risk: (DdAssessment & { details: RiskDetails }) | null;
   decision: DdDecision | null;

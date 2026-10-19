@@ -362,6 +362,11 @@ export async function assessRisk(args: {
   companyName: string;
   docs: RiskInputDoc[];
   criteria: RiskCriterionSeed[];
+  /**
+   * 기업이 파일 대신 "해당 없음"이라고 적어 낸 항목. 서류가 아니라 **주장**이라
+   * 문서 블록이 아닌 별도 텍스트로, 자기확약이라고 밝혀 넣는다.
+   */
+  declarations?: { label: string; reason: string }[];
 }): Promise<{
   data: RiskAssessment;
   usage: ScreenUsage;
@@ -391,8 +396,22 @@ export async function assessRisk(args: {
     content.push(fileBlock(doc.bytes, kind, doc.mimeType));
   }
 
-  if (content.length === 0)
+  const declarations = args.declarations ?? [];
+  if (content.length === 0 && declarations.length === 0)
     throw new Error("판정할 수 있는 문서가 없습니다(전부 미지원 형식이거나 용량 초과).");
+
+  if (declarations.length > 0) {
+    content.push({
+      type: "text",
+      text: [
+        "[회사의 자기확약 — 서류가 아니라 회사가 제출 포털에 직접 적어 낸 주장이다.",
+        " 검증 자료가 아니므로 이것만으로 어떤 기준도 level='none' 이 될 수 없다.",
+        " 다른 문서가 이 주장과 어긋나면 그 자체를 high 로 본다.]",
+        "",
+        ...declarations.map((d) => `· ${d.label}: "${d.reason}"`),
+      ].join("\n"),
+    });
+  }
 
   const criteriaText = args.criteria
     .map((c) => `- ${c.code} — ${c.label}: ${c.guidance}`)

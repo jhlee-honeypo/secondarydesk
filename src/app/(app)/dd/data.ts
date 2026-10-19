@@ -10,6 +10,7 @@ import type {
   DdBatchData,
   DdCompany,
   DdCriterion,
+  DdDeclaration,
   DdFile,
   RiskDetails,
   Verdict,
@@ -89,9 +90,9 @@ export async function loadBatch(batchId: string): Promise<DdBatchData | null> {
 
   // 기업이 없으면 in() 에 빈 배열이 들어가 PostgREST 가 전건을 긁을 수 있으므로
   // 아예 조회하지 않는다.
-  const [filesRes, assessRes, decisionRes] =
+  const [filesRes, assessRes, decisionRes, declRes] =
     companyIds.length === 0
-      ? [{ data: [] }, { data: [] }, { data: [] }]
+      ? [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
       : await Promise.all([
           supabase
             .from("dd_files")
@@ -109,6 +110,10 @@ export async function loadBatch(batchId: string): Promise<DdBatchData | null> {
             .select(
               "company_id, verdict, reason, updated_at, updater:updated_by (name, email)",
             )
+            .in("company_id", companyIds),
+          supabase
+            .from("dd_declarations")
+            .select("company_id, criterion_code, kind, reason, updated_at")
             .in("company_id", companyIds),
         ]);
 
@@ -170,6 +175,20 @@ export async function loadBatch(batchId: string): Promise<DdBatchData | null> {
     });
   }
 
+  const declByCompany = new Map<string, DdDeclaration[]>();
+  for (const d of (declRes.data ?? []) as Record<string, unknown>[]) {
+    const cid = d.company_id as string;
+    const item: DdDeclaration = {
+      criterionCode: d.criterion_code as string,
+      kind: d.kind === "deferred" ? "deferred" : "none_applicable",
+      reason: (d.reason as string) ?? "",
+      updatedAt: d.updated_at as string,
+    };
+    const list = declByCompany.get(cid);
+    if (list) list.push(item);
+    else declByCompany.set(cid, [item]);
+  }
+
   const companies: DdCompany[] = (companyRows ?? []).map((c) => {
     const id = c.id as string;
     const assessments = assessByCompany.get(id) ?? [];
@@ -180,6 +199,7 @@ export async function loadBatch(batchId: string): Promise<DdBatchData | null> {
       name: c.name as string,
       note: (c.note as string) ?? "",
       files: filesByCompany.get(id) ?? [],
+      declarations: declByCompany.get(id) ?? [],
       completeness: completeness as DdCompany["completeness"],
       risk: risk as DdCompany["risk"],
       decision: decisionByCompany.get(id) ?? null,

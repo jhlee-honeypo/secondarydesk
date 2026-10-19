@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { Fragment, useRef, useState, useTransition } from "react";
 import { AlertTriangle, ExternalLink, FolderOpen, Trash2, Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +21,13 @@ import { cn } from "@/lib/utils";
 
 import {
   clearDecision,
+  clearDeclaration,
   deleteFile,
   getFileUrl,
   registerFile,
   runCompleteness,
   setDecision,
+  setDeclaration,
   setFileCategory,
 } from "../actions";
 import { classifyAllFiles } from "./classify-loop";
@@ -48,6 +50,10 @@ const STATUS_STYLE: Record<string, string> = {
   stale: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   undated: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
   uncertain: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+  // 진술은 충족이지만 서류가 아니다 — 초록(ok)과 같은 색을 주면 화면에서
+  // '제출됨'과 구별되지 않는다.
+  declared: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300",
+  deferred: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   na: "bg-muted text-muted-foreground",
 };
 
@@ -58,6 +64,8 @@ const STATUS_LABEL: Record<string, string> = {
   stale: "만료",
   undated: "발급일 미상",
   uncertain: "확인 필요",
+  declared: "해당 없음 진술",
+  deferred: "설립 후 제출",
   na: "해당 없음",
 };
 
@@ -109,6 +117,12 @@ export function CompanyDetail({
   const folderRef = useRef<HTMLInputElement>(null);
   const [decisionReason, setDecisionReason] = useState(company.decision?.reason ?? "");
   const [busy, setBusy] = useState("");
+  /** 진술을 편집 중인 체크리스트 코드. null = 닫힘. */
+  const [declCode, setDeclCode] = useState<string | null>(null);
+  const [declKind, setDeclKind] = useState<"none_applicable" | "deferred">(
+    "none_applicable",
+  );
+  const [declReason, setDeclReason] = useState("");
 
   /** 분류 루프 — 업로드 직후 자동 실행되고, 버튼으로도 돌릴 수 있다. */
   const classify = async () => {
@@ -220,6 +234,44 @@ export function CompanyDetail({
       const res = await clearDecision(company.id);
       if (!res.ok) setError(res.error);
       setDecisionReason("");
+      router.refresh();
+    });
+  };
+
+  // 진술 입력 — 한 번에 한 항목만 연다(표 안에서 편집한다).
+  const declByCode = new Map(company.declarations.map((d) => [d.criterionCode, d]));
+
+  const openDeclare = (code: string) => {
+    const existing = declByCode.get(code);
+    setDeclCode(code);
+    setDeclKind(existing?.kind ?? "none_applicable");
+    setDeclReason(existing?.reason ?? "");
+  };
+
+  const saveDeclaration = () => {
+    if (!declCode) return;
+    start(async () => {
+      const res = await setDeclaration({
+        companyId: company.id,
+        criterionCode: declCode,
+        kind: declKind,
+        reason: declReason,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setDeclCode(null);
+      setError("");
+      router.refresh();
+    });
+  };
+
+  const removeDeclaration = (code: string) => {
+    start(async () => {
+      const res = await clearDeclaration(company.id, code);
+      if (!res.ok) setError(res.error);
+      setDeclCode(null);
       router.refresh();
     });
   };
@@ -345,32 +397,131 @@ export function CompanyDetail({
                       <th className="px-3 py-1.5 text-left font-medium">체크리스트</th>
                       <th className="px-3 py-1.5 text-left font-medium">상태</th>
                       <th className="px-3 py-1.5 text-left font-medium">비고</th>
+                      <th className="px-3 py-1.5 text-right font-medium">응답</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {company.completeness.details.items.map((it) => (
-                      <tr key={it.code} className="border-b last:border-0">
-                        <td className="px-3 py-1.5">
-                          {it.label}
-                          {!it.required && (
-                            <span className="ml-1.5 text-xs text-muted-foreground">
-                              선택
-                            </span>
+                    {company.completeness.details.items.map((it) => {
+                      const decl = declByCode.get(it.code);
+                      const editing = declCode === it.code;
+                      return (
+                        <Fragment key={it.code}>
+                          <tr className="border-b last:border-0">
+                            <td className="px-3 py-1.5">
+                              {it.label}
+                              {!it.required && (
+                                <span className="ml-1.5 text-xs text-muted-foreground">
+                                  선택
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <Badge
+                                variant="secondary"
+                                className={cn("font-medium", STATUS_STYLE[it.status])}
+                              >
+                                {STATUS_LABEL[it.status] ?? it.status}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                              {it.reason}
+                            </td>
+                            <td className="px-3 py-1.5 text-right">
+                              {/* 파일이 올라온 항목에는 진술을 받지 않는다 — 실물이
+                                  있으면 그쪽이 판단 근거다. */}
+                              {it.fileIds.length === 0 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-xs"
+                                  disabled={pending}
+                                  onClick={() =>
+                                    editing ? setDeclCode(null) : openDeclare(it.code)
+                                  }
+                                >
+                                  {decl ? "수정" : "해당 없음 기록"}
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                          {editing && (
+                            <tr className="border-b bg-muted/30 last:border-0">
+                              <td colSpan={4} className="px-3 py-3">
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-2 text-xs">
+                                    <Button
+                                      variant={
+                                        declKind === "none_applicable"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() => setDeclKind("none_applicable")}
+                                    >
+                                      해당 없음 진술
+                                    </Button>
+                                    <Button
+                                      variant={declKind === "deferred" ? "default" : "outline"}
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() => setDeclKind("deferred")}
+                                    >
+                                      법인 설립 후 제출
+                                    </Button>
+                                  </div>
+                                  <Textarea
+                                    rows={3}
+                                    value={declReason}
+                                    onChange={(e) => setDeclReason(e.target.value)}
+                                    placeholder={
+                                      declKind === "none_applicable"
+                                        ? "기업이 적어 낸 '해당 없음' 사유를 그대로 옮겨 주세요. 리스크 판정이 이 문장을 자기확약으로 읽고 다른 서류와 대조합니다."
+                                        : "설립 예정일 등 참고 사항(비워도 됩니다)."
+                                    }
+                                    className="text-sm"
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    {declKind === "none_applicable"
+                                      ? "응답으로는 충족 처리되지만 서류로 검증된 것은 아닙니다 — 리스크 판정에서 자기확약으로 다룹니다."
+                                      : "필수 집계(분모)에서 제외됩니다. 법인 설립 전이라 발급 자체가 불가능한 서류에만 쓰세요."}
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      disabled={pending}
+                                      onClick={saveDeclaration}
+                                    >
+                                      저장
+                                    </Button>
+                                    {decl && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        disabled={pending}
+                                        onClick={() => removeDeclaration(it.code)}
+                                      >
+                                        기록 삭제
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      onClick={() => setDeclCode(null)}
+                                    >
+                                      취소
+                                    </Button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <Badge
-                            variant="secondary"
-                            className={cn("font-medium", STATUS_STYLE[it.status])}
-                          >
-                            {STATUS_LABEL[it.status] ?? it.status}
-                          </Badge>
-                        </td>
-                        <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                          {it.reason}
-                        </td>
-                      </tr>
-                    ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </Card>

@@ -8,7 +8,11 @@ import {
   type DocCriterionSeed,
   type RiskCriterionSeed,
 } from "@/lib/dd-defaults";
-import { judgeCompleteness, type DdFileForJudging } from "@/lib/dd-completeness";
+import {
+  judgeCompleteness,
+  type DdDeclarationForJudging,
+  type DdFileForJudging,
+} from "@/lib/dd-completeness";
 import { readableKind, unsupportedReason } from "@/lib/dd-file-kind";
 import {
   assessRisk,
@@ -254,8 +258,87 @@ export async function setFileCategory(
 }
 
 // =============================================================================
+// 진술 — 파일 없이 응답한 항목
+// =============================================================================
+
+/**
+ * '해당 없음' 사유 또는 '설립 후 제출 예정'을 기록한다.
+ *
+ * 제출 포털에서 기업이 파일 대신 사유를 적어 응답한 항목을 옮겨 담는 자리다.
+ * 이게 없으면 "타법인 겸직 없음"처럼 **파일이 존재할 수 없는** 항목이 전부
+ * 미제출로 떨어진다(실측: 배치 전원 탈락).
+ */
+export async function setDeclaration(args: {
+  companyId: string;
+  criterionCode: string;
+  kind: "none_applicable" | "deferred";
+  reason: string;
+}): Promise<ActionResult> {
+  const me = await getCurrentUser();
+  if (!me) return fail("로그인이 필요합니다.");
+
+  const reason = args.reason.trim();
+  // 사유 없는 '해당 없음'은 심사에 쓸 수 없다 — 무엇을 근거로 없다는 건지가
+  // 리스크 판정의 입력이다. deferred 는 사유가 자명해 비워 둘 수 있다.
+  if (args.kind === "none_applicable" && !reason)
+    return fail("'해당 없음' 사유를 입력해 주세요.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("dd_declarations").upsert(
+    {
+      company_id: args.companyId,
+      criterion_code: args.criterionCode,
+      kind: args.kind,
+      reason,
+      updated_at: new Date().toISOString(),
+      updated_by: me.id,
+    },
+    { onConflict: "company_id,criterion_code" },
+  );
+  if (error) return fail(error.message);
+
+  // 응답이 바뀌면 완결성 판정도 따라가야 한다 — 수동 재실행을 요구하면
+  // 화면이 옛 판정을 계속 보여 준다(AI 콜 없는 산술이라 비용도 없다).
+  await runCompleteness(args.companyId);
+  touch();
+  return { ok: true };
+}
+
+export async function clearDeclaration(
+  companyId: string,
+  criterionCode: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("dd_declarations")
+    .delete()
+    .eq("company_id", companyId)
+    .eq("criterion_code", criterionCode);
+  if (error) return fail(error.message);
+
+  await runCompleteness(companyId);
+  touch();
+  return { ok: true };
+}
+
+// =============================================================================
 // 판정
 // =============================================================================
+
+async function loadDeclarations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  companyId: string,
+): Promise<DdDeclarationForJudging[]> {
+  const { data } = await supabase
+    .from("dd_declarations")
+    .select("criterion_code, kind, reason")
+    .eq("company_id", companyId);
+  return (data ?? []).map((d) => ({
+    criterionCode: d.criterion_code as string,
+    kind: d.kind as DdDeclarationForJudging["kind"],
+    reason: (d.reason as string) ?? "",
+  }));
+}
 
 type CriterionRow = {
   code: string;
@@ -425,6 +508,7 @@ export async function runCompleteness(companyId: string): Promise<ActionResult> 
     companyName: company.name,
     criteria: doc,
     files,
+    declarations: await loadDeclarations(supabase, companyId),
   });
 
   const { error } = await supabase.from("dd_assessments").upsert(
@@ -507,13 +591,27 @@ export async function runRisk(
     });
   }
 
-  if (docs.length === 0) return fail("판정에 넣을 분류된 문서가 없습니다.");
+  // 기업이 "해당 없음"이라고 적어 낸 항목도 판정에 넣는다. 안 넣으면 모델이
+  // 그 기준을 그냥 'unknown' 으로 두고, 회사가 뭐라고 주장했는지가 투심 자료에서
+  // 사라진다. 자기확약이라는 표시는 반드시 붙인다 — RISK_SYSTEM 의 가드가
+  // 이걸 보고 level='none' 으로 올리지 않는다.
+  const declarations = await loadDeclarations(supabase, companyId);
+  const declared = declarations.filter(
+    (d) => d.kind === "none_applicable" && d.reason,
+  );
+
+  if (docs.length === 0 && declared.length === 0)
+    return fail("판정에 넣을 분류된 문서가 없습니다.");
 
   try {
     const { data, skipped } = await assessRisk({
       companyName: company.name,
       docs,
       criteria: risk,
+      declarations: declared.map((d) => ({
+        label: labelByCode.get(d.criterionCode) ?? d.criterionCode,
+        reason: d.reason,
+      })),
     });
 
     const { error } = await supabase.from("dd_assessments").upsert(

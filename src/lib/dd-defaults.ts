@@ -126,7 +126,10 @@ export const DOC_CRITERIA: DocCriterionSeed[] = [
     label: "지식재산/기술권리",
     guidance:
       "특허·상표·디자인 등록원부 또는 출원 명세, 소프트웨어 저작권 등록증, 기술이전·라이선스 계약. 권리자 명의가 법인인지가 핵심.",
-    required: false,
+    // 제출 포털에서 '필수 응답'으로 요청한 항목이다 — 보유 IP 가 없으면 그
+    // 사실을 진술로 받는다. 요청해 놓고 심사에서 선택으로 두면 응답을 평가에
+    // 쓰지 않게 된다.
+    required: true,
     maxAgeDays: 0,
   },
   {
@@ -134,7 +137,8 @@ export const DOC_CRITERIA: DocCriterionSeed[] = [
     label: "주요 계약/정부지원 약정",
     guidance:
       "매출 비중이 큰 고객·공급사 계약, 정부 R&D 과제 협약서, 보조금 교부결정서. 기술료 납부·지분 제한 같은 사후 의무가 붙는다.",
-    required: false,
+    // 위 ip 와 같은 이유로 필수 — 포털의 '필수 응답' 항목이다.
+    required: true,
     maxAgeDays: 0,
   },
   {
@@ -150,7 +154,10 @@ export const DOC_CRITERIA: DocCriterionSeed[] = [
     label: "고용/핵심인력 계약",
     guidance:
       "핵심 인력 근로계약서, 스톡옵션(주식매수선택권) 부여 계약·이사회/주총 의사록, 비밀유지·경업금지·직무발명 귀속 약정.",
-    required: true,
+    // 포털에서 '해당 시' 로 요청한 조건부 항목이다. 창업 초기에는 대표 1인이라
+    // 근로계약 자체가 없는 경우가 많다 — 필수로 두면 그 기업이 전부 탈락한다
+    // (실측: 배치 SparkClaw #1 에서 이 항목이 최다 누락 사유였다).
+    required: false,
     maxAgeDays: 0,
   },
 ];
