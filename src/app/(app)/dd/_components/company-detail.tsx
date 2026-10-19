@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { AlertTriangle, ExternalLink, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, ExternalLink, FolderOpen, Trash2, Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ import {
   setDecision,
   setFileCategory,
 } from "../actions";
+import { classifyAllFiles } from "./classify-loop";
+import { collectDroppedFiles, collectPickedFiles } from "./folder-drop";
 import {
   VERDICT_LABEL,
   effectiveCode,
@@ -101,27 +103,49 @@ export function CompanyDetail({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [uploading, setUploading] = useState<string>("");
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [decisionReason, setDecisionReason] = useState(company.decision?.reason ?? "");
+  const [busy, setBusy] = useState("");
+
+  /** 분류 루프 — 업로드 직후 자동 실행되고, 버튼으로도 돌릴 수 있다. */
+  const classify = async () => {
+    setError("");
+    const out = await classifyAllFiles(company.id, (p) => {
+      setBusy(
+        p.done === p.total
+          ? "완결성 판정 중…"
+          : `AI 분류 중 ${p.done + 1}/${p.total} — ${p.fileName}`,
+      );
+    });
+    setBusy("");
+    if (out.failures.length > 0) setError(out.failures.join(" / "));
+    router.refresh();
+    return out;
+  };
 
   /**
    * 브라우저 → Storage 직접 업로드. 서버 액션은 메타 등록만 한다(본문 크기 제한
    * 회피 + 큰 스캔 PDF 를 서버 메모리로 통과시키지 않기 위해).
+   * 업로드가 끝나면 **분류까지 이어서 돌린다** — 파일을 넣는 것과 분류는 사람 입장에서
+   * 한 동작이고, 버튼을 따로 누르게 하면 '미분류'인 채로 방치된다.
    */
-  const upload = async (files: FileList | File[]) => {
+  const upload = async (files: File[]) => {
     setError("");
-    const list = Array.from(files);
-    if (list.length === 0) return;
+    if (files.length === 0) {
+      setError("올릴 수 있는 파일을 찾지 못했습니다. 폴더가 비어 있는지 확인해 주세요.");
+      return;
+    }
 
     const supabase = createClient();
     const problems: string[] = [];
+    let uploaded = 0;
 
-    for (let i = 0; i < list.length; i += 1) {
-      const file = list[i];
-      setUploading(`업로드 중 ${i + 1}/${list.length} — ${file.name}`);
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i];
+      setBusy(`업로드 중 ${i + 1}/${files.length} — ${file.name}`);
 
       const path = `${batchId}/${company.id}/${safeKey(file.name)}`;
       const { error: upError } = await supabase.storage
@@ -140,11 +164,13 @@ export function CompanyDetail({
         byteSize: file.size,
       });
       if (!res.ok) problems.push(`${file.name}: ${res.error}`);
+      else uploaded += 1;
     }
 
-    setUploading("");
+    setBusy("");
     if (problems.length > 0) setError(problems.join(" / "));
-    router.refresh();
+    if (uploaded > 0) await classify();
+    else router.refresh();
   };
 
   const recategorize = (fileId: string, code: string) => {
@@ -202,6 +228,11 @@ export function CompanyDetail({
     (company.completeness?.details.companyMismatches ?? []).map((m) => m.fileId),
   );
 
+  // 판독 불가 파일은 분류 대상이 아니므로 미분류로 세지 않는다(영원히 안 줄어든다).
+  const unclassifiedCount = company.files.filter(
+    (f) => f.readable && f.classifiedAt === null,
+  ).length;
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-5xl">
@@ -228,29 +259,62 @@ export function CompanyDetail({
           onDrop={(e) => {
             e.preventDefault();
             setDragging(false);
-            void upload(e.dataTransfer.files);
+            // ⚠️ DataTransfer 는 핸들러가 반환되면 무효화되므로 **동기로** 넘긴다.
+            // collectDroppedFiles 가 내부에서 await 전에 entry 를 다 확보한다.
+            const collected = collectDroppedFiles(e.dataTransfer);
+            void collected.then(upload);
           }}
-          onClick={() => inputRef.current?.click()}
           className={cn(
-            "cursor-pointer rounded-lg border-2 border-dashed p-6 text-center text-sm transition-colors",
+            "rounded-lg border-2 border-dashed p-6 text-center text-sm transition-colors",
             dragging
               ? "border-primary bg-primary/5"
-              : "border-border text-muted-foreground hover:bg-muted/40",
+              : "border-border text-muted-foreground",
           )}
         >
           <Upload className="mx-auto mb-2 size-5" />
-          {uploading || "서류 폴더를 통째로 끌어다 놓거나 클릭해 선택하세요"}
-          <p className="mt-1 text-xs">
-            PDF·이미지만 AI 가 읽습니다. 엑셀·한글 파일은 올라가지만 판독 불가로
-            표시되니 PDF 로 변환해 주세요.
+          {busy || "서류 폴더를 통째로 끌어다 놓으세요 (하위 폴더까지 읽습니다)"}
+          {!busy && (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => folderRef.current?.click()}
+              >
+                <FolderOpen className="size-4" />
+                폴더 선택
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => inputRef.current?.click()}
+              >
+                파일 선택
+              </Button>
+            </div>
+          )}
+          <p className="mt-2 text-xs">
+            올리면 AI 분류가 자동으로 이어집니다. PDF·이미지만 읽으며, 엑셀·한글
+            파일은 올라가되 판독 불가로 표시되니 PDF 로 변환해 주세요.
           </p>
+          {/* webkitdirectory 는 타입 정의에 없어 속성을 문자열로 넘긴다(표준 밖 속성). */}
+          <input
+            ref={folderRef}
+            type="file"
+            multiple
+            hidden
+            {...{ webkitdirectory: "", directory: "" }}
+            onChange={(e) => {
+              void upload(collectPickedFiles(e.target.files));
+              e.target.value = "";
+            }}
+          />
           <input
             ref={inputRef}
             type="file"
             multiple
             hidden
             onChange={(e) => {
-              if (e.target.files) void upload(e.target.files);
+              void upload(collectPickedFiles(e.target.files));
               e.target.value = "";
             }}
           />
@@ -320,9 +384,28 @@ export function CompanyDetail({
 
         {/* ── 파일 목록 ────────────────────────────────────────────────── */}
         <section className="space-y-2">
-          <h3 className="text-sm font-semibold">
-            업로드 파일 {company.files.length}건
-          </h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">
+              업로드 파일 {company.files.length}건
+              {unclassifiedCount > 0 && (
+                <span className="ml-2 font-normal text-sky-700 dark:text-sky-400">
+                  미분류 {unclassifiedCount}건
+                </span>
+              )}
+            </h3>
+            {company.files.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending || busy !== ""}
+                onClick={() => void classify()}
+              >
+                {unclassifiedCount > 0
+                  ? `미분류 ${unclassifiedCount}건 분류`
+                  : "완결성 다시 판정"}
+              </Button>
+            )}
+          </div>
           {company.files.length === 0 ? (
             <p className="text-sm text-muted-foreground">아직 올린 파일이 없습니다.</p>
           ) : (

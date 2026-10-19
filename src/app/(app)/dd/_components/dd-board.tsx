@@ -11,12 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import {
-  addCompanies,
-  classifyCompanyFiles,
-  deleteCompany,
-  runRisk,
-} from "../actions";
+import { addCompanies, deleteCompany, runRisk } from "../actions";
+import { classifyAllFiles } from "./classify-loop";
 import {
   VERDICT_LABEL,
   effectiveCode,
@@ -88,21 +84,23 @@ export function DdBoard({ data }: { data: DdBatchData }) {
     });
   };
 
-  const classify = (c: DdCompany) => {
+  const classify = async (c: DdCompany) => {
     setError("");
-    setBusy((b) => ({ ...b, [c.id]: "서류 분류 중…" }));
-    start(async () => {
-      const res = await classifyCompanyFiles(c.id);
-      setBusy((b) => {
-        const next = { ...b };
-        delete next[c.id];
-        return next;
-      });
-      if (!res.ok) setError(`${c.name}: ${res.error}`);
-      else if (res.data.failed.length > 0)
-        setError(`${c.name} — 일부 실패: ${res.data.failed.join(" / ")}`);
-      router.refresh();
+    const out = await classifyAllFiles(c.id, (p) => {
+      setBusy((b) => ({
+        ...b,
+        [c.id]:
+          p.done === p.total ? "완결성 판정 중…" : `분류 중 ${p.done + 1}/${p.total}`,
+      }));
     });
+    setBusy((b) => {
+      const next = { ...b };
+      delete next[c.id];
+      return next;
+    });
+    if (out.failures.length > 0)
+      setError(`${c.name} — 일부 실패: ${out.failures.join(" / ")}`);
+    router.refresh();
   };
 
   const risk = (c: DdCompany) => {
@@ -290,7 +288,7 @@ export function DdBoard({ data }: { data: DdBatchData }) {
                               size="sm"
                               variant="outline"
                               disabled={pending || c.files.length === 0}
-                              onClick={() => classify(c)}
+                              onClick={() => void classify(c)}
                               title="미분류 서류를 AI 로 분류하고 완결성을 다시 셉니다"
                             >
                               ① 분류·완결성

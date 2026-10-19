@@ -304,82 +304,95 @@ async function loadCompany(
   return data as { id: string; name: string; batch_id: string } | null;
 }
 
-/**
- * 미분류 파일을 AI 로 분류하고, 이어서 완결성을 다시 센다.
- *
- * 순차 실행이다 — 한 기업의 파일은 10여 개고 대상이 20개사 이하라(사용자 확인)
- * 동시 실행으로 얻을 게 적은 반면, 429 를 맞으면 어느 파일이 실패했는지
- * 추적하기 어려워진다. 실패한 파일은 사유를 남기고 나머지는 계속 간다.
- */
-export async function classifyCompanyFiles(
+/** 아직 분류하지 않은 파일 목록(분류 루프의 작업 큐). */
+export async function listPendingClassification(
   companyId: string,
-): Promise<ActionResult<{ classified: number; failed: string[] }>> {
+): Promise<ActionResult<{ id: string; fileName: string }[]>> {
   const supabase = await createClient();
-  const company = await loadCompany(supabase, companyId);
+  const { data, error } = await supabase
+    .from("dd_files")
+    .select("id, file_name, readable, classified_at")
+    .eq("company_id", companyId)
+    .order("uploaded_at");
+  if (error) return fail(error.message);
+
+  const pending = (data ?? [])
+    .filter((f) => !f.classified_at && f.readable !== false)
+    .map((f) => ({ id: f.id as string, fileName: f.file_name as string }));
+  return { ok: true, data: pending };
+}
+
+/**
+ * 파일 한 건을 AI 로 분류한다.
+ *
+ * **한 액션이 한 파일만** 맡는 이유: 25건을 한 호출에서 돌리면 건당 수 초 × 25 로
+ * 서버 함수 시간 예산을 넘길 수 있고, 중간에 끊기면 어디까지 됐는지 알 수 없다.
+ * 파일 단위로 끊으면 진행률을 보여줄 수 있고, 실패한 건만 다시 돌릴 수 있다.
+ * 루프는 클라이언트가 돌린다(classifyAllFiles).
+ */
+export async function classifyOneFile(
+  fileId: string,
+): Promise<ActionResult<{ fileName: string; criterionCode: string }>> {
+  const supabase = await createClient();
+
+  const { data: f } = await supabase
+    .from("dd_files")
+    .select("id, company_id, storage_path, file_name, mime_type, readable")
+    .eq("id", fileId)
+    .maybeSingle();
+  if (!f) return fail("파일을 찾을 수 없습니다.");
+  if (f.readable === false) return fail(unsupportedReason(f.file_name as string));
+
+  const company = await loadCompany(supabase, f.company_id as string);
   if (!company) return fail("기업을 찾을 수 없습니다.");
 
   const { doc } = await loadCriteria(supabase, company.batch_id);
   if (doc.length === 0) return fail("서류 체크리스트가 비어 있습니다.");
 
-  const { data: files } = await supabase
-    .from("dd_files")
-    .select("id, storage_path, file_name, mime_type, readable, classified_at")
-    .eq("company_id", companyId);
+  try {
+    const { data: blob, error: dlError } = await supabase.storage
+      .from(BUCKET)
+      .download(f.storage_path as string);
+    if (dlError || !blob) throw new Error(dlError?.message ?? "파일을 받지 못했습니다");
 
-  const pending = (files ?? []).filter(
-    (f) => !f.classified_at && f.readable !== false,
-  );
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const { data } = await classifyDocument({
+      bytes,
+      mimeType: (f.mime_type as string) ?? "",
+      fileName: f.file_name as string,
+      companyName: company.name,
+      criteria: doc,
+    });
 
-  let classified = 0;
-  const failed: string[] = [];
+    const { error } = await supabase
+      .from("dd_files")
+      .update({
+        criterion_code: data.criterionCode,
+        doc_title: data.docTitle,
+        issued_date: data.issuedDate,
+        as_of_date: data.asOfDate,
+        doc_company: data.docCompany,
+        confidence: data.confidence,
+        classify_note: data.note,
+        classified_at: new Date().toISOString(),
+      })
+      .eq("id", fileId);
+    if (error) return fail(error.message);
 
-  for (const f of pending) {
-    try {
-      const { data: blob, error: dlError } = await supabase.storage
-        .from(BUCKET)
-        .download(f.storage_path as string);
-      if (dlError || !blob) throw new Error(dlError?.message ?? "파일을 받지 못했습니다");
-
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      const { data } = await classifyDocument({
-        bytes,
-        mimeType: (f.mime_type as string) ?? "",
-        fileName: f.file_name as string,
-        companyName: company.name,
-        criteria: doc,
-      });
-
-      await supabase
-        .from("dd_files")
-        .update({
-          criterion_code: data.criterionCode,
-          doc_title: data.docTitle,
-          issued_date: data.issuedDate,
-          as_of_date: data.asOfDate,
-          doc_company: data.docCompany,
-          confidence: data.confidence,
-          classify_note: data.note,
-          classified_at: new Date().toISOString(),
-        })
-        .eq("id", f.id as string);
-      classified += 1;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      failed.push(`${f.file_name}: ${msg}`);
-      // 분류 실패도 기록한다 — 안 남기면 버튼을 다시 누를 때마다 같은 파일에서
-      // 같은 시간을 태운다. classified_at 은 비워 둬 재시도는 가능하게.
-      await supabase
-        .from("dd_files")
-        .update({ classify_note: `분류 실패 — ${msg}` })
-        .eq("id", f.id as string);
-    }
+    return {
+      ok: true,
+      data: { fileName: f.file_name as string, criterionCode: data.criterionCode },
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // 실패 사유를 남긴다 — 안 남기면 화면에 '미분류'로만 보여 원인을 알 수 없다.
+    // classified_at 은 비워 둬 재시도 대상으로 남긴다.
+    await supabase
+      .from("dd_files")
+      .update({ classify_note: `분류 실패 — ${msg}` })
+      .eq("id", fileId);
+    return fail(`${f.file_name}: ${msg}`);
   }
-
-  const done = await runCompleteness(companyId);
-  if (!done.ok) return done;
-
-  touch();
-  return { ok: true, data: { classified, failed } };
 }
 
 /** 완결성 재계산. AI 콜 없음 — 분류 결과를 코드로 집계한다. */
