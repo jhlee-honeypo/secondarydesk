@@ -13,6 +13,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import type { DocCriterionSeed, RiskCriterionSeed } from "./dd-defaults";
+import { extractOfficeText } from "./dd-office-text";
 import {
   MAX_FILE_BYTES,
   readableKind,
@@ -30,31 +31,62 @@ const RISK_MODEL = "claude-opus-5";
 // 포맷 판별은 dd-file-kind.ts — 클라이언트와 공유한다).
 const MAX_RISK_TOTAL_BYTES = 24 * 1024 * 1024;
 
-function fileBlock(
+function textBlock(text: string): Anthropic.ContentBlockParam {
+  return {
+    type: "document",
+    source: { type: "text", media_type: "text/plain", data: text },
+  };
+}
+
+/**
+ * 파일 1건을 모델 입력 블록으로. Office 는 서버에서 텍스트를 뽑아야 하므로
+ * 비동기다. 추출이 실패하면 **블록을 만들지 않고** 사유를 돌려준다 — 호출하면
+ * 모델이 빈 내용에서 추측을 시작한다.
+ */
+async function fileBlock(
   bytes: Uint8Array,
   kind: ReadableKind,
   mimeType: string,
-): Anthropic.ContentBlockParam {
+  fileName: string,
+): Promise<
+  { ok: true; block: Anthropic.ContentBlockParam } | { ok: false; reason: string }
+> {
+  if (kind === "office") {
+    const res = await extractOfficeText(bytes, fileName);
+    if (!res.ok) return res;
+    // 원본이 워드·엑셀이라는 사실을 밝힌다. 모델이 "표제가 없다"를 이상 신호로
+    // 읽지 않도록 — 변환된 평문에는 서식이 남지 않는다.
+    return {
+      ok: true,
+      block: textBlock(
+        `[${fileName} — 워드/엑셀 문서에서 추출한 텍스트]\n\n${res.text}`,
+      ),
+    };
+  }
+
   const data = Buffer.from(bytes).toString("base64");
   if (kind === "image") {
     return {
-      type: "image",
-      source: {
-        type: "base64",
-        media_type: (mimeType || "image/png") as "image/png",
-        data,
+      ok: true,
+      block: {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: (mimeType || "image/png") as "image/png",
+          data,
+        },
       },
     };
   }
-  if (kind === "text") {
-    return {
-      type: "document",
-      source: { type: "text", media_type: "text/plain", data: Buffer.from(bytes).toString("utf8") },
-    };
-  }
+  if (kind === "text")
+    return { ok: true, block: textBlock(Buffer.from(bytes).toString("utf8")) };
+
   return {
-    type: "document",
-    source: { type: "base64", media_type: "application/pdf", data },
+    ok: true,
+    block: {
+      type: "document",
+      source: { type: "base64", media_type: "application/pdf", data },
+    },
   };
 }
 
@@ -96,7 +128,24 @@ const CLASSIFY_SYSTEM = [
   "this file IS, and read off a few identifying facts.",
   "",
   "RULES:",
-  "- Judge by the document's actual content, never by its filename. Filenames are wrong often.",
+  "- Judge by the document's actual content. A filename is a hint, not an answer: when the",
+  "  content contradicts it, the content wins and you say so in note.",
+  "- A document's HEADING is the company's own answer to 'which item is this'. They submit one",
+  "  document per checklist item. So when the heading names a checklist item, classify it as that",
+  "  item unless the document is plainly a different KIND of document altogether (a file titled",
+  "  '정관' that is actually an 등기부등본 → 등기부등본). Covering a neighbouring topic inside is",
+  "  not grounds to move it. Filenames often carry the item number ('09_…', '12. …') — same signal.",
+  "- If the document contains a TABLE, what that table enumerates is what the document is. Prose",
+  "  underneath is elaboration. A 경영진 현황표 (성명·직위·담당·지분) followed by three paragraphs",
+  "  about one director's outside company is still 창업자·경영진 현황 — do not reclassify it by",
+  "  paragraph count. Companies file the neighbouring item as its own separate document.",
+  "- These pairs get confused. Decide by what the document is FOR, not what it mentions:",
+  "  · 창업자/경영진 현황 vs 타법인 운영·겸직·특수관계 — the first is about the people (이력·역할·",
+  "    지분), the second is about their ties to OTHER companies. A 겸직 없음 line inside a 경영진",
+  "    현황표 does not make it the second.",
+  "  · 재무제표 vs 자본금 납입·자금 현황 — 재무상태표·손익계산서·자산부채 현황 is 재무제표. Only",
+  "    납입 증빙·잔고증명·계좌 거래내역 is 자본금.",
+  "  · 법인등기부등본 is ALWAYS 등기부등본, whatever item it was submitted under.",
   "- A file may contain several documents concatenated (e.g. scanned bundle). Classify it as the",
   "  checklist item that occupies most of the file, and say so in note.",
   "- If the file matches NO checklist item, return criterionCode ''. Do not force a match.",
@@ -167,6 +216,9 @@ export async function classifyDocument(args: {
       `파일이 너무 큽니다(${(args.bytes.byteLength / 1024 / 1024).toFixed(1)}MB, 상한 20MB)`,
     );
 
+  const prepared = await fileBlock(args.bytes, kind, args.mimeType, args.fileName);
+  if (!prepared.ok) throw new Error(prepared.reason);
+
   const client = new Anthropic();
   const response = await client.messages.create({
     model: CLASSIFY_MODEL,
@@ -181,7 +233,7 @@ export async function classifyDocument(args: {
       {
         role: "user",
         content: [
-          fileBlock(args.bytes, kind, args.mimeType),
+          prepared.block,
           {
             type: "text",
             text: [
@@ -390,10 +442,15 @@ export async function assessRisk(args: {
       skipped.push({ fileName: doc.fileName, reason: "합계 용량 한도 초과 — 따로 검토 필요" });
       continue;
     }
+    const prepared = await fileBlock(doc.bytes, kind, doc.mimeType, doc.fileName);
+    if (!prepared.ok) {
+      skipped.push({ fileName: doc.fileName, reason: prepared.reason });
+      continue;
+    }
     total += doc.bytes.byteLength;
     // 파일 앞에 라벨을 붙여 둬야 모델이 evidence 에 문서명을 적을 수 있다.
     content.push({ type: "text", text: `[문서] ${doc.label || "미분류"} — ${doc.fileName}` });
-    content.push(fileBlock(doc.bytes, kind, doc.mimeType));
+    content.push(prepared.block);
   }
 
   const declarations = args.declarations ?? [];
