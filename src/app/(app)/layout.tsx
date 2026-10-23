@@ -28,7 +28,7 @@ export default async function AppLayout({
           flex 기본 stretch 면 높이가 문서 전체가 되어 sticky 가 동작하지 않으므로
           self-start 로 늘어남을 막는다. */}
       <div className="sticky top-0 hidden h-svh w-16 shrink-0 self-start md:block">
-        <aside className="group absolute inset-y-0 left-0 z-40 flex w-16 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out hover:w-60 hover:shadow-xl">
+        <aside className="group absolute inset-y-0 left-0 z-50 flex w-16 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out hover:w-60 hover:shadow-xl">
           <div className="flex h-14 items-center gap-2 px-5">
             <span className="size-5 shrink-0 rounded-md bg-primary" aria-hidden />
             <span className="whitespace-nowrap text-sm font-semibold tracking-tight opacity-0 transition-opacity duration-200 group-hover:opacity-100">
